@@ -4,7 +4,7 @@ A multi-agent simulation of an Agile development team. AI agents collaborate to 
 
 ## Demo
 
-https://github.com/TensorOpsAI/agent-scrum/raw/main/AgentScrum.mov
+https://github.com/TensorOpsAI/agent-scrum/raw/main/AgentScrum.mp4
 
 ## Quick Start
 
