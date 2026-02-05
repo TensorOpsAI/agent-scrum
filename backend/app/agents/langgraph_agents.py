@@ -316,7 +316,7 @@ class SimulatedAgent:
                 if 30 < len(sent) < 300 and is_actionable(sent) and not is_intro_line(sent):
                     sentence_features.append(sent)
             if sentence_features:
-                features = sentence_features[:8]
+                features = sentence_features[:15]
                 logger.info(f"[SIMULATED:product_owner] Strategy 6 (sentences): found {len(features)} features")
 
         # Strategy 7: Split by paragraphs
@@ -363,7 +363,39 @@ class SimulatedAgent:
                 seen.add(f_lower)
                 unique_features.append(f)
 
-        features = unique_features[:8]  # Allow up to 8 stories
+        features = unique_features[:15]  # Allow up to 15 stories for thorough PRD breakdown
+
+        # If we have fewer than 10 features, derive additional stories from existing ones
+        # This ensures thorough coverage as a good PO would do
+        if len(features) < 10 and len(features) > 0:
+            derived_stories = []
+            for feature in features[:5]:  # Derive from first 5 features
+                # Add error handling story
+                derived_stories.append(f"Handle errors and edge cases for: {feature[:80]}")
+                # Add validation story
+                derived_stories.append(f"Input validation and data integrity for: {feature[:80]}")
+
+            # Add common cross-cutting stories
+            derived_stories.extend([
+                "User notification system for important events and updates",
+                "Settings and preferences management for users",
+                "Admin dashboard for monitoring and management",
+                "Search and filter functionality across the application",
+                "Data export and reporting capabilities",
+                "User onboarding and help documentation",
+                "Performance optimization and caching",
+                "Audit logging for security and compliance",
+            ])
+
+            # Add derived stories until we have at least 10
+            for derived in derived_stories:
+                if len(features) >= 10:
+                    break
+                d_lower = derived.lower()[:50]
+                if d_lower not in seen:
+                    seen.add(d_lower)
+                    features.append(derived)
+
         logger.info(f"[SIMULATED:product_owner] Extracted {len(features)} features: {[f[:50] for f in features]}")
 
         stories_created = 0
@@ -591,12 +623,17 @@ Use these tools to accomplish your work:
 ## Your Workflow
 When given a PRD (Product Requirements Document):
 1. Identify ALL distinct features/capabilities mentioned
-2. For EACH feature, create a separate story using create_story()
-3. Write acceptance criteria focused on user outcomes, not implementation
-4. Prioritize by business value (most critical = priority 1)
+2. Be THOROUGH - look for explicit AND implicit requirements
+3. For EACH feature, create a separate story using create_story()
+4. Write acceptance criteria focused on user outcomes, not implementation
+5. Prioritize by business value (most critical = priority 1)
 
 ## Guidelines
-- Create MULTIPLE stories from a PRD (one per distinct feature/capability)
+- Create AT LEAST 10 stories from a PRD - be elaborate and thorough
+- Break down large features into multiple smaller stories
+- Look for hidden requirements: error handling, edge cases, settings, notifications
+- Consider user types: admins, regular users, guests - each may need separate stories
+- Think about CRUD: create/read/update/delete are often separate stories
 - Story format: "As a [user], I want [feature], so that [benefit]"
 - Acceptance criteria: "Given... When... Then..." or bullet points
 - Focus on WHAT users can do, not HOW developers should code it
