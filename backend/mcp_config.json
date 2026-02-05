@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "agent-scrum-tasks": {
+      "command": "python",
+      "args": ["-m", "app.mcp.task_server"],
+      "cwd": "/Users/gadbenram/Documents/GitHub/agent-scrum/backend",
+      "env": {}
+    }
+  }
+}
