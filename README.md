@@ -2,6 +2,10 @@
 
 A multi-agent simulation of an Agile development team. AI agents collaborate to process requirements, break down stories, review code, and run tests - all visible in real-time on a Kanban board.
 
+## Demo
+
+https://github.com/TensorOpsAI/agent-scrum/raw/main/AgentScrum.mov
+
 ## Quick Start
 
 ```bash
