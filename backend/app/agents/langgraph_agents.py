@@ -104,14 +104,20 @@ class SimulatedAgent:
         # Product Owner: Parse PRD and create stories
         # Only treat as PRD if it looks like actual requirements, not a chat message
         if self.agent_id == "product_owner":
-            # Skip if it looks like a chat command (starts with @, very short, or is a question)
+            # Skip if it looks like a chat command - must be SHORT and match chat patterns
+            # Long messages (>200 chars) are likely PRDs, not chat
+            msg_lower = last_message.lower().strip()
             is_chat_message = (
                 last_message.strip().startswith("@") or
-                len(last_message) < 50 or
-                last_message.strip().endswith("?") or
-                "start " in last_message.lower() or
-                "please " in last_message.lower() or
-                "can you" in last_message.lower()
+                len(last_message) < 100 or  # Very short = likely chat
+                (len(last_message) < 300 and (  # Medium length + chat patterns = chat
+                    msg_lower.endswith("?") or
+                    msg_lower.startswith("please ") or
+                    msg_lower.startswith("can you") or
+                    msg_lower.startswith("start ") or
+                    msg_lower.startswith("hey ") or
+                    msg_lower.startswith("hi ")
+                ))
             )
 
             if is_chat_message:
