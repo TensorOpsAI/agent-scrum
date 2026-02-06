@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 
-from app.db.models import TaskStatus, AgentType
+from app.db.models import TaskStatus
 
 
 class TaskBase(BaseModel):
@@ -22,7 +22,7 @@ class TaskUpdate(BaseModel):
     implementation_notes: Optional[str] = None
     test_scenarios: Optional[str] = None
     status: Optional[TaskStatus] = None
-    assigned_agent: Optional[AgentType] = None
+    assigned_agent: Optional[str] = None
 
 
 class TaskStatusTransition(BaseModel):
@@ -33,7 +33,7 @@ class TaskResponse(TaskBase):
     id: int
     story_id: int
     status: TaskStatus
-    assigned_agent: Optional[AgentType] = None
+    assigned_agent: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

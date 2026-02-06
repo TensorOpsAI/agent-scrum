@@ -12,15 +12,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["prd"])
 
 
-async def _process_prd_background(prd_content: str, title: str | None):
+async def _process_prd_background(prd_content: str, title: str | None, board_id: int):
     """Process PRD in the background so API returns immediately."""
-    logger.info(f"[PRD] Background processing started. Title: {title}, Content length: {len(prd_content)}")
+    logger.info(f"[PRD] Background processing started. Title: {title}, Board: {board_id}, Content length: {len(prd_content)}")
     try:
         async with async_session_maker() as db:
             logger.info("[PRD] Database session created, calling on_prd_submitted...")
             result = await on_prd_submitted(
                 prd_content=prd_content,
                 title=title,
+                board_id=board_id,
                 db=db,
             )
             logger.info(f"[PRD] on_prd_submitted completed. Result: {result}")
@@ -41,7 +42,7 @@ async def submit_prd(
     Stories will appear on the board as they are created via WebSocket.
     """
     # Start background processing
-    asyncio.create_task(_process_prd_background(submission.content, submission.title))
+    asyncio.create_task(_process_prd_background(submission.content, submission.title, submission.board_id))
 
     return {
         "message": "PRD submitted - processing in background",

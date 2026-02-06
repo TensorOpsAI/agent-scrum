@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, FileText, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { prdApi } from '../../api/client';
+import { usePipelineStore } from '../../store/pipelineStore';
 
 interface PRDInputModalProps {
   isOpen: boolean;
@@ -13,20 +14,19 @@ export function PRDInputModal({ isOpen, onClose }: PRDInputModalProps) {
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentBoardId = usePipelineStore((s) => s.currentBoardId);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() || !currentBoardId) return;
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Submit PRD - processing happens in background
-      // Stories will arrive via WebSocket
-      await prdApi.submit(content, title || undefined);
+      await prdApi.submit(content, currentBoardId, title || undefined);
       setContent('');
       setTitle('');
       onClose();
@@ -126,10 +126,10 @@ Implement a secure user authentication system...
             </button>
             <button
               type="submit"
-              disabled={!content.trim() || isSubmitting}
+              disabled={!content.trim() || !currentBoardId || isSubmitting}
               className={clsx(
                 'flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors',
-                content.trim() && !isSubmitting
+                content.trim() && currentBoardId && !isSubmitting
                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
                   : 'bg-gray-600 text-gray-400 cursor-not-allowed'
               )}

@@ -182,7 +182,9 @@ class SimulatedAgent:
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
-        response_content = f"[Simulation Mode] {self.agent_id} processed: {last_message[:100]}..."
+        # Domain agent simulation - parse role from agent_id and look up simulation text
+        role, board_id = _parse_agent_id(self.agent_id)
+        response_content = await self._domain_simulation(role, board_id, last_message)
         response_messages.append(AIMessage(content=response_content))
         return {"messages": response_messages}
 
@@ -590,6 +592,61 @@ This task involves implementing the required functionality as specified.
 
         except Exception as e:
             logger.error(f"[SIMULATED:qa] Error in QA test: {e}", exc_info=True)
+
+    async def _domain_simulation(self, role: str, board_id: int | None, message: str) -> str:
+        """Handle domain-specific agent simulation for non-software-dev boards."""
+        import re
+        import asyncio
+
+        # Look up the board's template to find the right simulation
+        template_id = None
+        if board_id:
+            try:
+                from app.db.database import async_session_maker
+                from app.db.models import PipelineConfig
+                from sqlalchemy import select
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(PipelineConfig.template_id).where(PipelineConfig.id == board_id)
+                    )
+                    template_id = result.scalar_one_or_none()
+            except Exception:
+                pass
+
+        if not template_id:
+            template_id = "software_dev"
+
+        # Extract action from context (passed via swarm)
+        # The swarm sends messages like "Process item #3: Title" or "Process task #5: Title"
+        action = None
+        item_id = None
+
+        # Try to get action from the message context
+        story_match = re.search(r'item\s*#?(\d+)', message.lower())
+        task_match = re.search(r'task\s*#?(\d+)', message.lower())
+
+        if task_match:
+            item_id = int(task_match.group(1))
+        elif story_match:
+            item_id = int(story_match.group(1))
+
+        # Look up simulation text
+        domain_sims = DOMAIN_SIMULATIONS.get(template_id, {})
+        role_sims = domain_sims.get(role, {})
+
+        # Pick the first matching action text, or a generic one
+        if role_sims:
+            # Use the first available simulation for this role
+            action_key = next(iter(role_sims))
+            sim_text = role_sims[action_key]
+        else:
+            sim_text = f"{role.replace('_', ' ').title()} processed the item successfully."
+
+        # Simulate work
+        await asyncio.sleep(2)
+
+        item_ref = f"#{item_id}" if item_id else ""
+        return f"[Simulation Mode] {sim_text} {item_ref}".strip()
 
 
 # ============================================================================
@@ -1002,10 +1059,101 @@ def create_scrum_master_agent():
 
 
 # ============================================================================
+# DOMAIN-SPECIFIC SIMULATIONS
+# ============================================================================
+# Maps (template_id, role, action) -> simulated response text
+
+DOMAIN_SIMULATIONS = {
+    "software_dev": {
+        "product_owner": {
+            "parse_prd": "Analyzed PRD and created user stories with acceptance criteria.",
+        },
+        "developer": {
+            "breakdown": "Broke down story into implementable tasks with descriptions.",
+            "implementation": "Wrote detailed implementation notes for the task.",
+        },
+        "tech_lead": {
+            "review_tasks": "Reviewed task breakdown. All tasks approved and moved to ready for development.",
+        },
+        "code_reviewer": {
+            "code_review": "Code review passed. Implementation looks good, no issues found.",
+        },
+        "qa": {
+            "qa_scenarios": "Created comprehensive test scenarios covering happy path and edge cases.",
+            "qa_run": "All tests passed. Task verified and marked as done.",
+        },
+    },
+    "talent_acquisition": {
+        "recruiter": {
+            "screen_resume": "Reviewed candidate resume. 5 years experience in the field. Skills match requirements. Recommending for phone screen.",
+            "phone_screen": "Conducted 30-min phone screen. Strong communication skills. Technical knowledge verified. Moving to interview stage.",
+        },
+        "interview_coordinator": {
+            "schedule_interview": "Scheduled panel interview with 3 team members for Thursday 2PM. Sent calendar invites and prep materials.",
+            "conduct": "Coordinated interview logistics. All interviewers confirmed. Room and video link set up.",
+        },
+        "hiring_manager": {
+            "evaluate": "Reviewed candidate profile. Technical skills align with team needs. Cultural fit assessment: positive. Approved for next round.",
+            "review_feedback": "Reviewed all interviewer feedback. Consensus is positive. Proceeding to offer stage.",
+        },
+        "hr_coordinator": {
+            "prepare_offer": "Prepared competitive offer package. Drafted offer letter with benefits summary. Pending approval.",
+            "verify": "Completed background check verification. All references checked. Clear to proceed.",
+            "finalize": "Finalized onboarding package. Start date confirmed. Welcome materials prepared.",
+        },
+        "sourcing_specialist": {
+            "source": "Sourced 15 potential candidates from job boards and LinkedIn. 8 match core requirements.",
+        },
+    },
+    "sales": {
+        "account_executive": {
+            "qualify_lead": "Completed discovery call. Identified 3 pain points. Budget confirmed. Decision timeline: 30 days.",
+            "create_proposal": "Built custom proposal addressing key requirements. Included ROI analysis showing 3x return.",
+            "demo": "Delivered product demo to 4 stakeholders. Strong positive feedback from CTO. Next step: POC.",
+        },
+        "solutions_engineer": {
+            "build_poc": "Built custom demo environment. Addressed 5 technical requirements. POC ready for delivery.",
+        },
+        "contract_specialist": {
+            "negotiate": "Reviewed contract terms. Applied standard MSA template. Sent for legal review.",
+            "draft_contract": "Drafted service agreement with negotiated terms. Pending legal review.",
+            "finalize_contract": "Contract finalized. All parties signed. Deal closed successfully.",
+        },
+        "sales_manager": {
+            "review_deal": "Reviewed deal pipeline. Approved 15% discount. Stage gate passed.",
+        },
+        "lead_generator": {
+            "generate": "Generated 20 qualified leads from inbound marketing campaigns.",
+        },
+    },
+    "ciso": {
+        "threat_analyst": {
+            "assess_threat": "Analyzed threat vector. CVSS score: 7.8 (High). Attack surface: external-facing API. Recommending immediate mitigation.",
+        },
+        "security_engineer": {
+            "mitigate": "Deployed WAF rule to block exploit vector. Applied security patches to 12 affected servers. Monitoring for anomalies.",
+            "implement_control": "Implemented access control policy. Updated firewall rules. Deployed IDS signatures.",
+            "deploy_fix": "Deployed security fix to production. Verified patch integrity. No service disruption.",
+        },
+        "compliance_officer": {
+            "audit": "Mapped risk to SOC2 CC6.1 control. Generated compliance evidence report. 2 findings need remediation.",
+            "compliance_review": "Reviewed mitigation for regulatory compliance. Controls align with NIST CSF. Documentation updated.",
+        },
+        "incident_responder": {
+            "verify_mitigation": "Verified mitigation effectiveness. Ran penetration test against patched endpoint. No vulnerabilities detected.",
+        },
+        "risk_manager": {
+            "assess_residual": "Residual risk score reduced from 7.8 to 2.1 after mitigation. Accepted within risk tolerance. Moving to monitoring.",
+        },
+    },
+}
+
+
+# ============================================================================
 # AGENT REGISTRY
 # ============================================================================
 
-# Map of agent IDs to their factory functions
+# Map of built-in agent roles to their factory functions
 AGENT_FACTORIES = {
     "product_owner": create_product_owner_agent,
     "tech_lead": create_tech_lead_agent,
@@ -1043,17 +1191,42 @@ AGENT_SKILLS = {
 }
 
 
+def _parse_agent_id(agent_id: str) -> tuple[str, int | None]:
+    """Parse agent_id like 'recruiter_3' into (role, board_id).
+
+    Returns (role, board_id) or (agent_id, None) if not a board-scoped agent.
+    """
+    parts = agent_id.rsplit("_", 1)
+    if len(parts) == 2 and parts[1].isdigit():
+        return parts[0], int(parts[1])
+    return agent_id, None
+
+
 def get_agent(agent_id: str):
-    """Get an agent instance by ID."""
-    factory = AGENT_FACTORIES.get(agent_id)
+    """Get an agent instance by ID.
+
+    For board-scoped agents like 'developer_1', extracts the role and
+    creates the appropriate agent (built-in factory or domain SimulatedAgent).
+    """
+    role, board_id = _parse_agent_id(agent_id)
+
+    # Try built-in factory first (by role)
+    factory = AGENT_FACTORIES.get(role)
     if factory:
-        return factory()
-    return None
+        agent = factory()
+        # Override the agent_id for board-scoped agents
+        if hasattr(agent, 'agent_id'):
+            agent.agent_id = agent_id
+        return agent
+
+    # Domain agent - create a SimulatedAgent with domain context
+    return SimulatedAgent(agent_id, tools=[], system_prompt="")
 
 
 def get_agent_skills(agent_id: str) -> list[dict]:
     """Get the skills list for an agent (for A2A discovery)."""
-    return AGENT_SKILLS.get(agent_id, [])
+    role, _ = _parse_agent_id(agent_id)
+    return AGENT_SKILLS.get(role, [])
 
 
 def list_available_agents() -> list[str]:

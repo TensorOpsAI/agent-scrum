@@ -1,7 +1,8 @@
 import { clsx } from 'clsx';
 import { FileText, CheckCircle, Circle } from 'lucide-react';
 import type { Story } from '../../types';
-import { STORY_STATUS_LABELS } from '../../types';
+import { getStatusLabel, getStatusColor } from '../../types';
+import { usePipelineStore } from '../../store/pipelineStore';
 
 interface StoryCardProps {
   story: Story;
@@ -9,21 +10,17 @@ interface StoryCardProps {
   onClick: () => void;
 }
 
-const statusColors: Record<string, string> = {
-  backlog: 'border-l-gray-500',
-  ready_for_breakdown: 'border-l-blue-500',
-  in_breakdown: 'border-l-blue-400',
-  tasks_in_review: 'border-l-purple-500',
-  in_development: 'border-l-yellow-500',
-  in_qa: 'border-l-pink-500',
-  done: 'border-l-green-500',
-};
-
 export function StoryCard({ story, isSelected, onClick }: StoryCardProps) {
+  const columns = usePipelineStore((s) => s.activeConfig?.columns ?? []);
+
   const progress =
     story.task_count > 0
       ? Math.round((story.completed_task_count / story.task_count) * 100)
       : 0;
+
+  // Derive border color from the column's bg color
+  const bgColor = getStatusColor(story.status, columns);
+  const borderColor = bgColor.replace('bg-', 'border-l-');
 
   return (
     <div
@@ -31,7 +28,7 @@ export function StoryCard({ story, isSelected, onClick }: StoryCardProps) {
       className={clsx(
         'bg-gray-800 rounded-lg p-4 cursor-pointer transition-all border-l-4',
         'hover:bg-gray-750 hover:shadow-lg',
-        statusColors[story.status],
+        borderColor,
         isSelected && 'ring-2 ring-blue-500 bg-gray-750'
       )}
     >
@@ -50,7 +47,7 @@ export function StoryCard({ story, isSelected, onClick }: StoryCardProps) {
 
       <div className="flex items-center justify-between text-xs">
         <span className="px-2 py-1 rounded bg-gray-700 text-gray-300">
-          {STORY_STATUS_LABELS[story.status]}
+          {getStatusLabel(story.status, columns)}
         </span>
 
         {story.task_count > 0 && (

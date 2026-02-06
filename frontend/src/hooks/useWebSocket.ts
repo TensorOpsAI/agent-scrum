@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useStoryStore } from '../store/storyStore';
-import type { Story, Task, AgentType } from '../types';
+import { usePipelineStore } from '../store/pipelineStore';
+import type { Story, Task, AgentType, PipelineConfig } from '../types';
 
 interface WebSocketMessage {
   event: string;
@@ -13,6 +14,7 @@ export function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const { addStory, updateStory, addTask, updateTask, updateAgentStatus, fetchStories } =
     useStoryStore();
+  const { addBoard, removeBoard, fetchBoards } = usePipelineStore();
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -57,18 +59,31 @@ export function useWebSocket() {
       // Store the last message for components that want to react to all events
       setLastMessage(message);
 
-      switch (message.event) {
-        case 'story:created':
-          addStory(message.data as Story);
-          break;
+      const currentBoardId = usePipelineStore.getState().currentBoardId;
 
-        case 'story:updated':
-          updateStory(message.data as Story);
+      switch (message.event) {
+        case 'story:created': {
+          const story = message.data as Story;
+          // Only add if it belongs to the current board
+          if (story.board_id === currentBoardId) {
+            addStory(story);
+          }
           break;
+        }
+
+        case 'story:updated': {
+          const story = message.data as Story;
+          if (story.board_id === currentBoardId) {
+            updateStory(story);
+          }
+          break;
+        }
 
         case 'story:deleted':
           // Refetch stories to ensure consistency
-          fetchStories();
+          if (currentBoardId) {
+            fetchStories(currentBoardId);
+          }
           break;
 
         case 'task:created':
@@ -81,7 +96,9 @@ export function useWebSocket() {
 
         case 'task:deleted':
           // Refetch to ensure consistency
-          fetchStories();
+          if (currentBoardId) {
+            fetchStories(currentBoardId);
+          }
           break;
 
         case 'agent:status_changed': {
@@ -99,11 +116,23 @@ export function useWebSocket() {
           console.log('Agent activity:', message.data);
           break;
 
+        case 'board:created': {
+          const board = message.data as PipelineConfig;
+          addBoard(board);
+          break;
+        }
+
+        case 'board:deleted': {
+          const { id } = message.data as { id: number };
+          removeBoard(id);
+          break;
+        }
+
         default:
           console.log('Unknown WebSocket event:', message.event);
       }
     },
-    [addStory, updateStory, addTask, updateTask, updateAgentStatus, fetchStories]
+    [addStory, updateStory, addTask, updateTask, updateAgentStatus, fetchStories, addBoard, removeBoard, fetchBoards]
   );
 
   useEffect(() => {

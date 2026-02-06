@@ -2,8 +2,6 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 
-from app.db.models import StoryStatus
-
 
 class StoryBase(BaseModel):
     title: str
@@ -13,6 +11,7 @@ class StoryBase(BaseModel):
 
 
 class StoryCreate(StoryBase):
+    board_id: int
     prd_content: Optional[str] = None
 
 
@@ -21,16 +20,17 @@ class StoryUpdate(BaseModel):
     description: Optional[str] = None
     acceptance_criteria: Optional[str] = None
     priority: Optional[int] = None
-    status: Optional[StoryStatus] = None
+    status: Optional[str] = None
 
 
 class StoryStatusTransition(BaseModel):
-    status: StoryStatus
+    status: str
 
 
 class StoryResponse(StoryBase):
     id: int
-    status: StoryStatus
+    board_id: int
+    status: str
     prd_content: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -44,3 +44,4 @@ class StoryResponse(StoryBase):
 class PRDSubmission(BaseModel):
     content: str
     title: Optional[str] = None
+    board_id: int

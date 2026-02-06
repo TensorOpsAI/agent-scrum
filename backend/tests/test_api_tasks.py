@@ -2,6 +2,27 @@ import pytest
 from httpx import AsyncClient
 
 
+async def _get_default_board_id(client: AsyncClient) -> int:
+    """Helper: get the ID of the seeded default board."""
+    response = await client.get("/api/boards")
+    boards = response.json()
+    assert len(boards) > 0, "No boards found - seed may have failed"
+    return boards[0]["id"]
+
+
+async def _create_story(client: AsyncClient, title: str = "Test Story") -> int:
+    """Helper: create a story and return its ID."""
+    board_id = await _get_default_board_id(client)
+    response = await client.post("/api/stories", json={
+        "board_id": board_id,
+        "title": title,
+        "description": "Test description",
+        "priority": 1,
+    })
+    assert response.status_code == 200
+    return response.json()["id"]
+
+
 @pytest.mark.asyncio
 async def test_list_tasks_empty(client: AsyncClient):
     """Test listing tasks when database is empty."""
@@ -11,11 +32,9 @@ async def test_list_tasks_empty(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_task(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_create_task(client: AsyncClient, sample_task_data):
     """Test creating a new task."""
-    # Create a story first
-    story_response = await client.post("/api/stories", json=sample_story_data)
-    story_id = story_response.json()["id"]
+    story_id = await _create_story(client)
 
     # Create task
     task_data = {**sample_task_data, "story_id": story_id}
@@ -39,11 +58,9 @@ async def test_create_task_story_not_found(client: AsyncClient, sample_task_data
 
 
 @pytest.mark.asyncio
-async def test_get_task(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_get_task(client: AsyncClient, sample_task_data):
     """Test getting a specific task."""
-    # Create a story and task
-    story_response = await client.post("/api/stories", json=sample_story_data)
-    story_id = story_response.json()["id"]
+    story_id = await _create_story(client)
 
     task_data = {**sample_task_data, "story_id": story_id}
     task_response = await client.post("/api/tasks", json=task_data)
@@ -66,11 +83,9 @@ async def test_get_task_not_found(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_update_task(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_update_task(client: AsyncClient, sample_task_data):
     """Test updating a task."""
-    # Create a story and task
-    story_response = await client.post("/api/stories", json=sample_story_data)
-    story_id = story_response.json()["id"]
+    story_id = await _create_story(client)
 
     task_data = {**sample_task_data, "story_id": story_id}
     task_response = await client.post("/api/tasks", json=task_data)
@@ -90,11 +105,9 @@ async def test_update_task(client: AsyncClient, sample_story_data, sample_task_d
 
 
 @pytest.mark.asyncio
-async def test_transition_task_status(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_transition_task_status(client: AsyncClient, sample_task_data):
     """Test transitioning a task's status."""
-    # Create a story and task
-    story_response = await client.post("/api/stories", json=sample_story_data)
-    story_id = story_response.json()["id"]
+    story_id = await _create_story(client)
 
     task_data = {**sample_task_data, "story_id": story_id}
     task_response = await client.post("/api/tasks", json=task_data)
@@ -112,11 +125,9 @@ async def test_transition_task_status(client: AsyncClient, sample_story_data, sa
 
 
 @pytest.mark.asyncio
-async def test_delete_task(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_delete_task(client: AsyncClient, sample_task_data):
     """Test deleting a task."""
-    # Create a story and task
-    story_response = await client.post("/api/stories", json=sample_story_data)
-    story_id = story_response.json()["id"]
+    story_id = await _create_story(client)
 
     task_data = {**sample_task_data, "story_id": story_id}
     task_response = await client.post("/api/tasks", json=task_data)
@@ -132,15 +143,10 @@ async def test_delete_task(client: AsyncClient, sample_story_data, sample_task_d
 
 
 @pytest.mark.asyncio
-async def test_list_tasks_by_story(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_list_tasks_by_story(client: AsyncClient, sample_task_data):
     """Test listing tasks filtered by story_id."""
-    # Create two stories
-    story1_response = await client.post("/api/stories", json=sample_story_data)
-    story1_id = story1_response.json()["id"]
-
-    story2_data = {**sample_story_data, "title": "Story 2"}
-    story2_response = await client.post("/api/stories", json=story2_data)
-    story2_id = story2_response.json()["id"]
+    story1_id = await _create_story(client, "Story 1")
+    story2_id = await _create_story(client, "Story 2")
 
     # Create tasks for each story
     task1_data = {**sample_task_data, "story_id": story1_id, "title": "Task 1"}
@@ -158,11 +164,9 @@ async def test_list_tasks_by_story(client: AsyncClient, sample_story_data, sampl
 
 
 @pytest.mark.asyncio
-async def test_list_tasks_by_status(client: AsyncClient, sample_story_data, sample_task_data):
+async def test_list_tasks_by_status(client: AsyncClient, sample_task_data):
     """Test listing tasks filtered by status."""
-    # Create a story
-    story_response = await client.post("/api/stories", json=sample_story_data)
-    story_id = story_response.json()["id"]
+    story_id = await _create_story(client)
 
     # Create two tasks
     task1_data = {**sample_task_data, "story_id": story_id, "title": "Task 1"}

@@ -1,53 +1,36 @@
-import { useEffect } from 'react';
 import { clsx } from 'clsx';
 import { useStoryStore } from '../../store/storyStore';
+import { usePipelineStore } from '../../store/pipelineStore';
 import { StoryCard } from './StoryCard';
-import type { Story, StoryStatus } from '../../types';
-import { STORY_STATUS_LABELS } from '../../types';
-
-const BOARD_COLUMNS: StoryStatus[] = [
-  'backlog',
-  'ready_for_breakdown',
-  'in_breakdown',
-  'tasks_in_review',
-  'in_development',
-  'in_qa',
-  'done',
-];
-
-const columnColors: Record<StoryStatus, string> = {
-  backlog: 'bg-gray-600',
-  ready_for_breakdown: 'bg-blue-600',
-  in_breakdown: 'bg-blue-500',
-  tasks_in_review: 'bg-purple-600',
-  in_development: 'bg-yellow-600',
-  in_qa: 'bg-pink-600',
-  done: 'bg-green-600',
-};
+import type { Story, PipelineColumn } from '../../types';
 
 interface KanbanColumnProps {
-  status: StoryStatus;
+  columnKey: string;
+  label: string;
+  color: string;
   stories: Story[];
   selectedStoryId: number | null;
   onSelectStory: (id: number) => void;
 }
 
 function KanbanColumn({
-  status,
+  columnKey,
+  label,
+  color,
   stories,
   selectedStoryId,
   onSelectStory,
 }: KanbanColumnProps) {
   return (
-    <div className="flex flex-col min-w-[280px] w-[280px] bg-gray-850 rounded-lg h-full">
+    <div className="flex flex-col min-w-[280px] w-[280px] bg-gray-850 rounded-lg h-full" data-status={columnKey}>
       <div
         className={clsx(
           'px-4 py-3 rounded-t-lg flex items-center justify-between flex-shrink-0',
-          columnColors[status]
+          color
         )}
       >
         <h2 className="font-semibold text-white text-sm">
-          {STORY_STATUS_LABELS[status]}
+          {label}
         </h2>
         <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-medium">
           {stories.length}
@@ -75,19 +58,18 @@ function KanbanColumn({
 }
 
 export function KanbanBoard() {
-  const { stories, selectedStoryId, setSelectedStory, fetchStories, isLoading } =
+  const { stories, selectedStoryId, setSelectedStory, isLoading } =
     useStoryStore();
+  const currentBoard = usePipelineStore((s) => s.currentBoard);
 
-  useEffect(() => {
-    fetchStories();
-  }, [fetchStories]);
+  const columns: PipelineColumn[] = currentBoard?.columns ?? [];
 
-  const storiesByStatus = BOARD_COLUMNS.reduce(
-    (acc, status) => {
-      acc[status] = stories.filter((s) => s.status === status);
+  const storiesByStatus = columns.reduce(
+    (acc, col) => {
+      acc[col.key] = stories.filter((s) => s.status === col.key);
       return acc;
     },
-    {} as Record<StoryStatus, Story[]>
+    {} as Record<string, Story[]>
   );
 
   if (isLoading && stories.length === 0) {
@@ -98,13 +80,23 @@ export function KanbanBoard() {
     );
   }
 
+  if (columns.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        No board selected
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-4 overflow-x-auto px-4 h-full pb-4">
-      {BOARD_COLUMNS.map((status) => (
+      {columns.map((col) => (
         <KanbanColumn
-          key={status}
-          status={status}
-          stories={storiesByStatus[status]}
+          key={col.key}
+          columnKey={col.key}
+          label={col.label}
+          color={col.color}
+          stories={storiesByStatus[col.key] || []}
           selectedStoryId={selectedStoryId}
           onSelectStory={setSelectedStory}
         />

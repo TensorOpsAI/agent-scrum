@@ -8,9 +8,10 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import Story, Task, StoryStatus, TaskStatus
+from app.db.models import Story, Task, SoftwareDevStatus, TaskStatus
 from app.agents.executor import executor
 from app.api.websocket.manager import broadcast_agent_activity
+from app.pipeline.templates import get_board
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 async def on_prd_submitted(
     prd_content: str,
     title: str | None,
+    board_id: int,
     db: AsyncSession,
 ) -> dict:
     """Trigger when a new PRD is submitted.
@@ -25,7 +27,13 @@ async def on_prd_submitted(
     Executes Product Owner synchronously to parse PRD and create stories.
     Stories are created in READY_FOR_BREAKDOWN status - monitor will pick them up.
     """
-    logger.info(f"[TRIGGER] on_prd_submitted called. Title: {title}, Content length: {len(prd_content)}")
+    logger.info(f"[TRIGGER] on_prd_submitted called. Title: {title}, Board: {board_id}, Content length: {len(prd_content)}")
+
+    # Guard: only run if automation is enabled for this board
+    board = await get_board(board_id, db)
+    if not board or not board.get("agent_automation"):
+        logger.info("[TRIGGER] Agent automation disabled, skipping PRD processing")
+        return {"skipped": True, "reason": "Agent automation disabled for this board"}
 
     await broadcast_agent_activity(
         "trigger",
@@ -38,6 +46,7 @@ async def on_prd_submitted(
     context = {
         "skill": "parse_prd",
         "triggered_by": "prd_submission",
+        "board_id": board_id,
     }
 
     logger.info("[TRIGGER] Calling executor.execute_agent for product_owner...")
@@ -61,8 +70,8 @@ async def on_prd_submitted(
 
 async def on_story_status_changed(
     story: Story,
-    old_status: StoryStatus,
-    new_status: StoryStatus,
+    old_status: str,
+    new_status: str,
     db: AsyncSession,
 ) -> dict:
     """Called when a story's status changes.
@@ -74,12 +83,12 @@ async def on_story_status_changed(
         "story_transition",
         {
             "story_id": story.id,
-            "from": old_status.value,
-            "to": new_status.value,
+            "from": old_status,
+            "to": new_status,
         }
     )
 
-    return {"status_changed": True, "new_status": new_status.value}
+    return {"status_changed": True, "new_status": new_status}
 
 
 async def on_task_status_changed(
@@ -168,6 +177,6 @@ async def trigger_continue_workflow(
 
     return {
         "story_id": story_id,
-        "status": story.status.value,
+        "status": story.status,
         "message": "Workflow will continue on next monitor check"
     }

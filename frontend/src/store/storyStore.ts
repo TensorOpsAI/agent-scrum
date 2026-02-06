@@ -11,7 +11,7 @@ interface StoryState {
   error: string | null;
 
   // Actions
-  fetchStories: () => Promise<void>;
+  fetchStories: (boardId?: number) => Promise<void>;
   fetchTasks: (storyId?: number) => Promise<void>;
   fetchAgents: () => Promise<void>;
   setSelectedStory: (id: number | null) => void;
@@ -41,10 +41,14 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchStories: async () => {
-    set({ isLoading: true, error: null });
+  fetchStories: async (boardId?: number) => {
+    // Only show loading spinner if we have no stories yet (first load)
+    const hasStories = get().stories.length > 0;
+    if (!hasStories) {
+      set({ isLoading: true, error: null });
+    }
     try {
-      const stories = await storyApi.list();
+      const stories = await storyApi.list(boardId);
       set({ stories, isLoading: false });
     } catch (error) {
       set({ error: 'Failed to fetch stories', isLoading: false });

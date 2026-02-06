@@ -10,7 +10,7 @@ from app.db.database import get_db
 from app.db.models import AgentMessage
 from app.a2a.router import a2a_router, AGENT_NAMES
 from app.a2a.registry import registry
-from app.agents.langgraph_agents import AGENT_FACTORIES
+from app.agents.langgraph_agents import AGENT_FACTORIES, get_agent
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -52,10 +52,10 @@ async def get_chat_messages(
     return [
         ChatMessageResponse(
             id=msg.id,
-            from_agent=msg.from_agent.value,
-            from_agent_name=AGENT_NAMES.get(msg.from_agent.value, msg.from_agent.value),
-            to_agent=msg.to_agent.value if msg.to_agent else None,
-            to_agent_name=AGENT_NAMES.get(msg.to_agent.value) if msg.to_agent else None,
+            from_agent=msg.from_agent,
+            from_agent_name=AGENT_NAMES.get(msg.from_agent, msg.from_agent.replace("_", " ").title()),
+            to_agent=msg.to_agent,
+            to_agent_name=AGENT_NAMES.get(msg.to_agent, msg.to_agent.replace("_", " ").title()) if msg.to_agent else None,
             content=msg.content,
             story_id=msg.story_id,
             task_id=msg.task_id,
@@ -89,8 +89,9 @@ async def send_message(
     # Default to product_owner if no target specified
     to_agent = request.to_agent or "product_owner"
 
-    # Validate agent exists
-    if to_agent not in AGENT_FACTORIES and to_agent != "client":
+    # Validate agent exists (accept both built-in roles and board-scoped IDs like "recruiter_3")
+    agent = get_agent(to_agent)
+    if agent is None and to_agent != "client":
         raise HTTPException(
             status_code=400,
             detail=f"Invalid agent: {to_agent}. Valid agents: {list(AGENT_FACTORIES.keys())}",

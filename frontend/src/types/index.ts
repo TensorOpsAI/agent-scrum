@@ -1,11 +1,5 @@
-export type StoryStatus =
-  | 'backlog'
-  | 'ready_for_breakdown'
-  | 'in_breakdown'
-  | 'tasks_in_review'
-  | 'in_development'
-  | 'in_qa'
-  | 'done';
+// StoryStatus is now a plain string - columns are defined by the active pipeline
+export type StoryStatus = string;
 
 export type TaskStatus =
   | 'draft'
@@ -31,6 +25,7 @@ export type AgentType = BuiltinAgentType | string;
 
 export interface Story {
   id: number;
+  board_id: number;
   title: string;
   description: string | null;
   acceptance_criteria: string | null;
@@ -81,7 +76,48 @@ export interface WebSocketMessage {
   data: unknown;
 }
 
-export const STORY_STATUS_LABELS: Record<StoryStatus, string> = {
+// Pipeline types
+export interface PipelineColumn {
+  key: string;
+  label: string;
+  color: string;
+  position: number;
+}
+
+export interface PipelineTemplate {
+  template_id: string;
+  name: string;
+  columns: PipelineColumn[];
+  agent_automation: boolean;
+  item_noun: string;
+  has_tasks: boolean;
+}
+
+export interface PipelineConfig {
+  id: number;
+  template_id: string;
+  name: string;
+  columns: PipelineColumn[];
+  agent_automation: boolean;
+  item_noun: string;
+  has_tasks: boolean;
+  story_count?: number;
+}
+
+// Helper: get the label for a status from pipeline columns
+export function getStatusLabel(status: string, columns: PipelineColumn[]): string {
+  const col = columns.find((c) => c.key === status);
+  return col?.label ?? status.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Helper: get the color for a status from pipeline columns
+export function getStatusColor(status: string, columns: PipelineColumn[]): string {
+  const col = columns.find((c) => c.key === status);
+  return col?.color ?? 'bg-gray-600';
+}
+
+// Hardcoded label maps kept for backward compat / task status
+export const STORY_STATUS_LABELS: Record<string, string> = {
   backlog: 'Backlog',
   ready_for_breakdown: 'Ready for Breakdown',
   in_breakdown: 'In Breakdown',

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Story, Task, Comment, StoryStatus, TaskStatus } from '../types';
+import type { Story, Task, Comment, StoryStatus, TaskStatus, PipelineTemplate, PipelineConfig } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -10,8 +10,10 @@ const api = axios.create({
 
 // Story API
 export const storyApi = {
-  list: async (status?: StoryStatus): Promise<Story[]> => {
-    const params = status ? { status } : {};
+  list: async (boardId?: number, status?: StoryStatus): Promise<Story[]> => {
+    const params: Record<string, unknown> = {};
+    if (boardId != null) params.board_id = boardId;
+    if (status) params.status = status;
     const response = await api.get<Story[]>('/stories', { params });
     return response.data;
   },
@@ -22,6 +24,7 @@ export const storyApi = {
   },
 
   create: async (data: {
+    board_id: number;
     title: string;
     description?: string;
     acceptance_criteria?: string;
@@ -118,8 +121,8 @@ export const taskApi = {
 
 // PRD API
 export const prdApi = {
-  submit: async (content: string, title?: string): Promise<Story> => {
-    const response = await api.post<Story>('/prd', { content, title });
+  submit: async (content: string, boardId: number, title?: string): Promise<Story> => {
+    const response = await api.post<Story>('/prd', { content, title, board_id: boardId });
     return response.data;
   },
 };
@@ -403,6 +406,39 @@ export const agentManagementApi = {
   getAgentCard: async (agentId: string): Promise<Record<string, unknown>> => {
     const response = await api.get(`/agent-management/agents/${agentId}/.well-known/agent.json`);
     return response.data;
+  },
+};
+
+// Pipeline API (templates only)
+export const pipelineApi = {
+  getTemplates: async (): Promise<PipelineTemplate[]> => {
+    const response = await api.get<PipelineTemplate[]>('/pipeline/templates');
+    return response.data;
+  },
+};
+
+// Board API
+export const boardApi = {
+  list: async (): Promise<PipelineConfig[]> => {
+    const response = await api.get<PipelineConfig[]>('/boards');
+    return response.data;
+  },
+
+  get: async (id: number): Promise<PipelineConfig> => {
+    const response = await api.get<PipelineConfig>(`/boards/${id}`);
+    return response.data;
+  },
+
+  create: async (templateId: string, name?: string): Promise<PipelineConfig> => {
+    const response = await api.post<PipelineConfig>('/boards', {
+      template_id: templateId,
+      name,
+    });
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/boards/${id}`);
   },
 };
 

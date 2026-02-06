@@ -4,7 +4,8 @@ import { clsx } from 'clsx';
 import { storyApi, taskApi } from '../../api/client';
 import { ActivityLog } from './ActivityLog';
 import type { Story, Task, Comment } from '../../types';
-import { STORY_STATUS_LABELS, TASK_STATUS_LABELS, getAgentLabel, getAgentColor } from '../../types';
+import { TASK_STATUS_LABELS, getAgentLabel, getAgentColor, getStatusLabel } from '../../types';
+import { usePipelineStore } from '../../store/pipelineStore';
 
 interface StoryDetailProps {
   storyId: number;
@@ -23,6 +24,7 @@ const taskStatusColors: Record<string, string> = {
 };
 
 export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
+  const columns = usePipelineStore((s) => s.activeConfig?.columns ?? []);
   const [story, setStory] = useState<Story | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -81,7 +83,7 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
                 'text-xs px-2 py-0.5 rounded',
                 story.status === 'done' ? 'bg-green-600' : 'bg-gray-600'
               )}>
-                {STORY_STATUS_LABELS[story.status]}
+                {getStatusLabel(story.status, columns)}
               </span>
             </div>
           </div>

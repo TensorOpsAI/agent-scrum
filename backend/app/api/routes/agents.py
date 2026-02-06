@@ -32,7 +32,7 @@ async def list_agents(db: AsyncSession = Depends(get_db)):
 
         agents.append({
             "id": agent.id,
-            "type": agent.id,
+            "type": agent.role or agent.id,
             "name": agent.name,
             "description": agent.description or "",
             "status": status,
@@ -61,7 +61,7 @@ async def get_agent_info(agent_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "id": agent.id,
-        "type": agent.id,
+        "type": agent.role or agent.id,
         "name": agent.name,
         "description": agent.description or "",
         "skills": agent.skills or [],
@@ -88,7 +88,7 @@ async def get_agent_status(agent_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "id": agent.id,
-        "type": agent.id,
+        "type": agent.role or agent.id,
         "name": agent.name,
         "status": status,
         "current_task": current_task,

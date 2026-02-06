@@ -56,6 +56,8 @@ class WSEvents:
     AGENT_ACTIVITY = "agent:activity"
     AGENT_CHAT = "agent:chat"
     SWARM_STATUS = "swarm:status"
+    BOARD_CREATED = "board:created"
+    BOARD_DELETED = "board:deleted"
 
 
 async def broadcast_story_created(story_data: dict):

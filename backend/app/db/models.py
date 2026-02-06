@@ -6,7 +6,8 @@ from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
-class StoryStatus(str, enum.Enum):
+# Renamed: kept for orchestrator/swarm internal use only
+class SoftwareDevStatus(str, enum.Enum):
     BACKLOG = "backlog"
     READY_FOR_BREAKDOWN = "ready_for_breakdown"
     IN_BREAKDOWN = "in_breakdown"
@@ -14,6 +15,10 @@ class StoryStatus(str, enum.Enum):
     IN_DEVELOPMENT = "in_development"
     IN_QA = "in_qa"
     DONE = "done"
+
+
+# Backward-compat alias so existing imports like `from app.db.models import StoryStatus` still work
+StoryStatus = SoftwareDevStatus
 
 
 class TaskStatus(str, enum.Enum):
@@ -39,19 +44,39 @@ class AgentType(str, enum.Enum):
     CLIENT = "client"  # Human user proxy for A2A communication
 
 
+class PipelineConfig(Base):
+    """Board configuration - defines the Kanban board columns."""
+    __tablename__ = "pipeline_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(String(50), nullable=False)
+    name = Column(String(100), nullable=False)
+    columns = Column(JSON, nullable=False)  # List of {key, label, color, position}
+    agent_automation = Column(Boolean, default=True)
+    item_noun = Column(String(50), default="Story")
+    has_tasks = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    stories = relationship("Story", back_populates="board", cascade="all, delete-orphan")
+    agents = relationship("DynamicAgent", back_populates="board", cascade="all, delete-orphan")
+
+
 class Story(Base):
     __tablename__ = "stories"
 
     id = Column(Integer, primary_key=True, index=True)
+    board_id = Column(Integer, ForeignKey("pipeline_configs.id"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     acceptance_criteria = Column(Text, nullable=True)
-    status = Column(Enum(StoryStatus), default=StoryStatus.BACKLOG, nullable=False)
+    status = Column(String(50), default="backlog", nullable=False)
     priority = Column(Integer, default=0)
     prd_content = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    board = relationship("PipelineConfig", back_populates="stories")
     tasks = relationship("Task", back_populates="story", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="story", cascade="all, delete-orphan")
 
@@ -66,7 +91,7 @@ class Task(Base):
     implementation_notes = Column(Text, nullable=True)
     test_scenarios = Column(Text, nullable=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.DRAFT, nullable=False)
-    assigned_agent = Column(Enum(AgentType), nullable=True)
+    assigned_agent = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -80,7 +105,7 @@ class Comment(Base):
     id = Column(Integer, primary_key=True, index=True)
     story_id = Column(Integer, ForeignKey("stories.id"), nullable=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
-    agent_type = Column(Enum(AgentType), nullable=False)
+    agent_type = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     extra_data = Column("metadata", JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -94,8 +119,8 @@ class AgentMessage(Base):
     __tablename__ = "agent_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    from_agent = Column(Enum(AgentType), nullable=False)
-    to_agent = Column(Enum(AgentType), nullable=True)  # None = broadcast to all
+    from_agent = Column(String(50), nullable=False)
+    to_agent = Column(String(50), nullable=True)  # None = broadcast to all
     content = Column(Text, nullable=False)
     story_id = Column(Integer, ForeignKey("stories.id"), nullable=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
@@ -107,16 +132,20 @@ class DynamicAgent(Base):
     """User-created agents that can be added/removed dynamically."""
     __tablename__ = "dynamic_agents"
 
-    id = Column(String(50), primary_key=True)  # e.g., "security_analyst_1"
+    id = Column(String(50), primary_key=True)  # e.g., "recruiter_3"
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
+    role = Column(String(50), nullable=True)  # Agent role within board (e.g., "recruiter")
     template = Column(String(50), nullable=True)  # Template used to create
+    board_id = Column(Integer, ForeignKey("pipeline_configs.id"), nullable=True)
     tools = Column(JSON, default=[])  # Selected tools from basket
     skills = Column(JSON, default=[])  # Custom skills
     capabilities = Column(JSON, default={})  # Agent capabilities
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    board = relationship("PipelineConfig", back_populates="agents")
 
 
 class CustomTool(Base):
