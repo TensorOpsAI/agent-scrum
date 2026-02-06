@@ -93,7 +93,7 @@ async def scan_board() -> dict:
                             "status": story.status,
                             "action": action,
                             "agent": agent_id,
-                            "message": f"Process item #{story.id}: {story.title}",
+                            "message": f"Process story #{story.id}: {story.title}",
                         })
 
             # Scan tasks for statuses that have handlers

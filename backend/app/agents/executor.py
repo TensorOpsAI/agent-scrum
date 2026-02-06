@@ -134,7 +134,8 @@ class AgentExecutor:
             # Execute the LangGraph agent
             logger.info(f"[EXECUTOR] Calling agent.ainvoke for {agent_id}...")
             result = await agent.ainvoke({
-                "messages": [HumanMessage(content=message)]
+                "messages": [HumanMessage(content=message)],
+                "context": context,
             })
             logger.info(f"[EXECUTOR] agent.ainvoke returned. Result keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
 

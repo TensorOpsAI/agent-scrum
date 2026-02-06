@@ -89,6 +89,7 @@ class SimulatedAgent:
         """Simulate agent invocation with mock tool calls."""
         logger.info(f"[SIMULATED:{self.agent_id}] ainvoke called")
         messages = input_data.get("messages", [])
+        self._context = input_data.get("context", {})
         if not messages:
             logger.warning(f"[SIMULATED:{self.agent_id}] No messages provided")
             return {"messages": [AIMessage(content="No input provided.")]}
@@ -101,9 +102,12 @@ class SimulatedAgent:
         response_messages = []
         import re
 
+        # Parse role from agent_id (e.g., "developer_1" -> "developer")
+        role, _ = _parse_agent_id(self.agent_id)
+
         # Product Owner: Parse PRD and create stories
         # Only treat as PRD if it looks like actual requirements, not a chat message
-        if self.agent_id == "product_owner":
+        if role == "product_owner":
             # Skip if it looks like a chat command - must be SHORT and match chat patterns
             # Long messages (>200 chars) are likely PRDs, not chat
             msg_lower = last_message.lower().strip()
@@ -127,13 +131,14 @@ class SimulatedAgent:
 
             logger.info(f"[SIMULATED:{self.agent_id}] Processing PRD content, will create stories")
             # This looks like a PRD - parse it and create stories
-            stories_created = await self._parse_prd_and_create_stories(last_message)
+            board_id = self._context.get("board_id")
+            stories_created = await self._parse_prd_and_create_stories(last_message, board_id=board_id)
             response_content = f"[Simulation Mode] Product Owner analyzed PRD and created {stories_created} user stories."
             response_messages.append(AIMessage(content=response_content))
             return {"messages": response_messages}
 
         # Developer: Break down story OR write implementation notes for task
-        if self.agent_id == "developer":
+        if role == "developer":
             # Check for task implementation first (more specific)
             task_match = re.search(r'task\s*#?(\d+)', last_message.lower())
             if task_match and "implementation" in last_message.lower():
@@ -153,7 +158,7 @@ class SimulatedAgent:
                 return {"messages": response_messages}
 
         # Tech Lead: Review tasks
-        if self.agent_id == "tech_lead":
+        if role == "tech_lead":
             story_match = re.search(r'story\s*#?(\d+)', last_message.lower())
             if story_match:
                 story_id = int(story_match.group(1))
@@ -163,7 +168,7 @@ class SimulatedAgent:
                 return {"messages": response_messages}
 
         # Code Reviewer: Review implementation
-        if self.agent_id == "code_reviewer":
+        if role == "code_reviewer":
             task_match = re.search(r'task\s*#?(\d+)', last_message.lower())
             if task_match:
                 task_id = int(task_match.group(1))
@@ -173,7 +178,7 @@ class SimulatedAgent:
                 return {"messages": response_messages}
 
         # QA: Test task
-        if self.agent_id == "qa":
+        if role == "qa":
             task_match = re.search(r'task\s*#?(\d+)', last_message.lower())
             if task_match:
                 task_id = int(task_match.group(1))
@@ -188,7 +193,7 @@ class SimulatedAgent:
         response_messages.append(AIMessage(content=response_content))
         return {"messages": response_messages}
 
-    async def _parse_prd_and_create_stories(self, prd_content: str) -> int:
+    async def _parse_prd_and_create_stories(self, prd_content: str, board_id: int = None) -> int:
         """Parse PRD and create user stories."""
         import re
 
@@ -412,13 +417,16 @@ class SimulatedAgent:
                 # Create a user story
                 title = f"As a user, I want {feature[:50]}..." if len(feature) > 50 else f"As a user, I want {feature}"
                 logger.info(f"[SIMULATED:product_owner] Creating story {i}: {title[:60]}...")
-                result = await create_story.ainvoke({
+                invoke_args = {
                     "title": title,
                     "description": f"[From PRD] {feature}",
                     "acceptance_criteria": f"- Feature is implemented as described\n- User can access the functionality\n- No errors occur during normal use",
                     "priority": i,
                     "prd_content": prd_content[:500],  # Store truncated PRD
-                })
+                }
+                if board_id is not None:
+                    invoke_args["board_id"] = board_id
+                result = await create_story.ainvoke(invoke_args)
                 logger.info(f"[SIMULATED:product_owner] Story created: {result}")
                 stories_created += 1
             except Exception as e:

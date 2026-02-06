@@ -1,6 +1,6 @@
 # Agent Scrum
 
-A multi-agent simulation of an Agile development team. AI agents collaborate to process requirements, break down stories, review code, and run tests - all visible in real-time on a Kanban board.
+A multi-agent simulation platform where AI agents self-organize to process work across different domains. Create boards for Software Development, Talent Acquisition, Sales, or Security Operations - each with its own domain-specific agents that collaborate in real-time on a Kanban board.
 
 ## Demo
 
@@ -16,15 +16,40 @@ Open http://localhost:5173
 
 ## What It Does
 
-Submit a PRD (Product Requirements Document) and watch AI agents work through it:
+Create a board from a template, submit work items, and watch domain-specific agents process them through the pipeline:
 
-1. **Product Owner** parses the PRD and creates multiple user stories
+### Software Development
+Submit a PRD and watch agents build it:
+1. **Product Owner** parses the PRD and creates user stories
 2. **Developer** breaks each story into tasks
 3. **Tech Lead** reviews and approves task breakdowns
 4. **Developer** writes implementation notes
 5. **Code Reviewer** reviews the implementation
 6. **QA** creates test scenarios and runs tests
-7. Stories automatically move to **Done** when complete
+
+### Talent Acquisition
+Submit a job requisition and watch the hiring pipeline:
+1. **Sourcing Specialist** finds candidates
+2. **Recruiter** screens resumes and conducts phone screens
+3. **Interview Coordinator** schedules interviews
+4. **Hiring Manager** evaluates candidates
+5. **HR Coordinator** prepares offers
+
+### Sales
+Submit a lead and watch the deal flow:
+1. **Lead Generator** qualifies leads
+2. **Account Executive** runs demos and creates proposals
+3. **Solutions Engineer** builds POCs
+4. **Sales Manager** reviews and approves deals
+5. **Contract Specialist** handles negotiations
+
+### CISO / Security Operations
+Submit a risk and watch the response:
+1. **Threat Analyst** assesses and classifies risks
+2. **Security Engineer** implements mitigations
+3. **Compliance Officer** audits regulatory alignment
+4. **Incident Responder** verifies mitigations
+5. **Risk Manager** assesses residual risk
 
 Everything happens in real-time with WebSocket updates - no page refresh needed.
 
@@ -44,7 +69,7 @@ Everything happens in real-time with WebSocket updates - no page refresh needed.
 ```bash
 make install      # Install Python + Node dependencies
 make dev          # Start backend + frontend
-make test         # Run 72 backend tests
+make test         # Run 80 backend tests
 make docker-up    # Start with Docker
 make mcp          # Start MCP server for external tools
 make reset        # Reset database
@@ -56,6 +81,8 @@ make reset        # Reset database
 ┌─────────────────────────────────────────────────────────────┐
 │                     Frontend (React)                         │
 │              http://localhost:5173                           │
+│                                                              │
+│   Board Selector ──→ Kanban Board ──→ Agent Chat Panel       │
 └────────────────────────┬────────────────────────────────────┘
                          │ REST + WebSocket
 ┌────────────────────────▼────────────────────────────────────┐
@@ -64,11 +91,15 @@ make reset        # Reset database
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │              LangGraph Swarm Orchestrator               │ │
 │  │                                                         │ │
-│  │   Product     Tech                    Code              │ │
-│  │    Owner     Lead     Developer     Reviewer     QA     │ │
-│  │      │         │          │            │          │     │ │
-│  │      └─────────┴──────────┴────────────┴──────────┘     │ │
-│  │                         │                                │ │
+│  │   ┌─────────────────────────────────────────────────┐  │ │
+│  │   │  Template-Aware Scanner (scans all boards)      │  │ │
+│  │   │  TEMPLATE_WORKFLOWS → dispatch to agents        │  │ │
+│  │   └──────────────────────┬──────────────────────────┘  │ │
+│  │                          ▼                              │ │
+│  │            dynamic_agent_node (universal)                │ │
+│  │     Resolves agent_id → role + board_id                 │ │
+│  │     Routes to SimulatedAgent with domain context        │ │
+│  │                          │                              │ │
 │  │              A2A Router (chat messages)                  │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                         │                                    │
@@ -79,36 +110,42 @@ make reset        # Reset database
                           │
 ┌─────────────────────────▼───────────────────────────────────┐
 │                    SQLite Database                           │
-│   Stories │ Tasks │ Comments │ AgentMessages │ DynamicAgents │
+│  PipelineConfig │ Stories │ Tasks │ Comments │ DynamicAgents │
+│    (Boards)     │         │       │          │  (per-board)  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Agents
+## Multi-Board System
 
-| Agent | Role |
-|-------|------|
-| **Product Owner** | Parses PRDs into multiple user stories (agile-focused, defines WHAT not HOW) |
-| **Developer** | Breaks stories into tasks, writes implementation notes |
-| **Tech Lead** | Reviews task breakdowns, provides technical guidance |
-| **Code Reviewer** | Reviews implementation, approves or requests changes |
-| **QA** | Creates test scenarios, runs tests, closes completed stories |
+Each board is created from a **template** that defines its columns, agents, and workflow rules:
 
-## Workflow
+| Template | Item Noun | Agents | Columns |
+|----------|-----------|--------|---------|
+| **Software Development** | Story | Product Owner, Developer, Tech Lead, Code Reviewer, QA | Backlog, Ready for Breakdown, In Breakdown, Tasks in Review, In Development, In QA, Done |
+| **Talent Acquisition** | Candidate | Sourcing Specialist, Recruiter, Hiring Manager, Interview Coordinator, HR Coordinator | Applied, Phone Screen, Interview, Offer, Hired, Rejected |
+| **Sales** | Deal | Lead Generator, Account Executive, Sales Manager, Solutions Engineer, Contract Specialist | Lead, Qualified, Proposal, Negotiation, Closed Won, Closed Lost |
+| **CISO** | Risk | Threat Analyst, Security Engineer, Compliance Officer, Incident Responder, Risk Manager | Identified, Assessing, Mitigating, Monitoring, Resolved, Accepted |
+
+Agents are board-scoped with IDs like `recruiter_3` (role + board ID). When a board is deleted, its agents are cascade-deleted.
+
+## Workflow Engine
+
+The swarm scanner checks all boards with `agent_automation` enabled every few seconds. For each board, it looks up `TEMPLATE_WORKFLOWS` to determine which column statuses have agent handlers:
 
 ```
-PRD Submitted
+Board (template_id: "talent_acquisition")
     ↓
-Product Owner creates stories ──→ READY_FOR_BREAKDOWN
+TEMPLATE_WORKFLOWS["talent_acquisition"]["story_handlers"]
+    "applied"     → (recruiter, screen_resume)
+    "phone_screen" → (recruiter, phone_screen)
+    "interview"    → (interview_coordinator, schedule_interview)
+    "offer"        → (hr_coordinator, prepare_offer)
     ↓
-Developer breaks down story ────→ IN_BREAKDOWN → TASKS_IN_REVIEW
+Agent ID = f"{role}_{board_id}" → e.g. "recruiter_3"
     ↓
-Tech Lead reviews tasks ────────→ IN_DEVELOPMENT
+SimulatedAgent with domain-specific response
     ↓
-Developer implements ───────────→ CODE_REVIEW
-    ↓
-Code Reviewer approves ─────────→ READY_FOR_QA → IN_QA
-    ↓
-QA tests and closes ────────────→ DONE
+Move item to next column + post chat message
 ```
 
 ## Configuration
@@ -164,23 +201,24 @@ agent-scrum/
 ├── backend/
 │   ├── app/
 │   │   ├── agents/
-│   │   │   ├── langgraph_agents.py   # Agent definitions (LangGraph)
-│   │   │   ├── swarm/                # Swarm orchestrator
-│   │   │   ├── tools/                # Database tools
+│   │   │   ├── langgraph_agents.py   # Agent definitions + domain simulations
+│   │   │   ├── swarm/                # Template-aware swarm orchestrator
+│   │   │   ├── tools/                # Database tools + tool registry
 │   │   │   └── executor.py           # Agent execution
 │   │   ├── api/                      # REST + WebSocket routes
 │   │   ├── a2a/                      # A2A protocol router
 │   │   ├── mcp/                      # MCP server
-│   │   ├── db/                       # SQLAlchemy models
+│   │   ├── pipeline/                 # Board templates + workflows
+│   │   ├── db/                       # SQLAlchemy models + seed
 │   │   └── main.py
-│   ├── tests/                        # 72 pytest tests
+│   ├── tests/                        # 80 pytest tests
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   │   ├── components/               # React components
 │   │   ├── api/                      # API client
-│   │   ├── store/                    # Zustand state
+│   │   ├── store/                    # Zustand state (story + pipeline)
 │   │   └── hooks/                    # WebSocket hook
 │   ├── Dockerfile
 │   └── package.json
@@ -195,6 +233,19 @@ agent-scrum/
 - **WebSocket**: `ws://localhost:8000/ws`
 - **Health**: http://localhost:8000/health
 
+### Key Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET/POST /api/boards` | List or create boards |
+| `GET/DELETE /api/boards/{id}` | Get or delete a board |
+| `GET /api/pipeline/templates` | List available board templates |
+| `POST /api/prd` | Submit a PRD / work item |
+| `GET/POST /api/stories` | List or create stories |
+| `GET/POST /api/tasks` | List or create tasks |
+| `GET /api/agents` | List all active agents |
+| `GET /api/agents/{id}` | Get agent info |
+
 ### WebSocket Events
 
 | Event | Description |
@@ -206,6 +257,8 @@ agent-scrum/
 | `agent:status_changed` | Agent started/stopped work |
 | `agent:chat` | Agent sent a message |
 | `swarm:status` | Swarm started/stopped/paused |
+| `board:created` | New board created |
+| `board:deleted` | Board deleted |
 
 ## Docker
 
@@ -224,7 +277,7 @@ make test                    # Run all tests
 cd backend && pytest -v      # Verbose output
 ```
 
-72 tests covering API endpoints, agent workflows, and database operations.
+80 tests covering API endpoints, agent workflows, multi-board operations, and database models.
 
 ## License
 
