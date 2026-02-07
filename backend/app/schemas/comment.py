@@ -2,12 +2,10 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional, Any
 
-from app.db.models import AgentType
-
 
 class CommentBase(BaseModel):
     content: str
-    agent_type: AgentType
+    agent_type: str
     metadata: Optional[dict[str, Any]] = None
 
 

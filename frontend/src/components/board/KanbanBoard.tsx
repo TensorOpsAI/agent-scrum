@@ -1,53 +1,37 @@
 import { useEffect } from 'react';
 import { clsx } from 'clsx';
 import { useStoryStore } from '../../store/storyStore';
+import { usePipelineStore } from '../../store/pipelineStore';
 import { StoryCard } from './StoryCard';
-import type { Story, StoryStatus } from '../../types';
-import { STORY_STATUS_LABELS } from '../../types';
-
-const BOARD_COLUMNS: StoryStatus[] = [
-  'backlog',
-  'ready_for_breakdown',
-  'in_breakdown',
-  'tasks_in_review',
-  'in_development',
-  'in_qa',
-  'done',
-];
-
-const columnColors: Record<StoryStatus, string> = {
-  backlog: 'bg-gray-600',
-  ready_for_breakdown: 'bg-blue-600',
-  in_breakdown: 'bg-blue-500',
-  tasks_in_review: 'bg-purple-600',
-  in_development: 'bg-yellow-600',
-  in_qa: 'bg-pink-600',
-  done: 'bg-green-600',
-};
+import type { Story, PipelineColumn } from '../../types';
 
 interface KanbanColumnProps {
-  status: StoryStatus;
+  columnKey: string;
+  label: string;
+  color: string;
   stories: Story[];
   selectedStoryId: number | null;
   onSelectStory: (id: number) => void;
 }
 
 function KanbanColumn({
-  status,
+  columnKey,
+  label,
+  color,
   stories,
   selectedStoryId,
   onSelectStory,
 }: KanbanColumnProps) {
   return (
-    <div className="flex flex-col min-w-[280px] w-[280px] bg-gray-850 rounded-lg h-full">
+    <div className="flex flex-col min-w-[280px] w-[280px] bg-gray-850 rounded-lg h-full" data-status={columnKey}>
       <div
         className={clsx(
           'px-4 py-3 rounded-t-lg flex items-center justify-between flex-shrink-0',
-          columnColors[status]
+          color
         )}
       >
         <h2 className="font-semibold text-white text-sm">
-          {STORY_STATUS_LABELS[status]}
+          {label}
         </h2>
         <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-medium">
           {stories.length}
@@ -66,7 +50,7 @@ function KanbanColumn({
 
         {stories.length === 0 && (
           <div className="text-center py-8 text-gray-500 text-sm">
-            No stories
+            No items
           </div>
         )}
       </div>
@@ -75,19 +59,34 @@ function KanbanColumn({
 }
 
 export function KanbanBoard() {
-  const { stories, selectedStoryId, setSelectedStory, fetchStories, isLoading } =
+  const { stories, selectedStoryId, setSelectedStory, isLoading } =
     useStoryStore();
+  const currentBoard = usePipelineStore((s) => s.currentBoard);
+  const epics = usePipelineStore((s) => s.epics);
+  const selectedEpicId = usePipelineStore((s) => s.selectedEpicId);
+  const setSelectedEpic = usePipelineStore((s) => s.setSelectedEpic);
+  const fetchEpics = usePipelineStore((s) => s.fetchEpics);
+
+  const epicNoun = currentBoard?.epic_noun ?? 'Epic';
 
   useEffect(() => {
-    fetchStories();
-  }, [fetchStories]);
+    if (currentBoard?.id) {
+      fetchEpics(currentBoard.id);
+    }
+  }, [currentBoard?.id, fetchEpics]);
 
-  const storiesByStatus = BOARD_COLUMNS.reduce(
-    (acc, status) => {
-      acc[status] = stories.filter((s) => s.status === status);
+  const columns: PipelineColumn[] = currentBoard?.columns ?? [];
+
+  const filteredStories = selectedEpicId
+    ? stories.filter((s) => s.epic_id === selectedEpicId)
+    : stories;
+
+  const storiesByStatus = columns.reduce(
+    (acc, col) => {
+      acc[col.key] = filteredStories.filter((s) => s.status === col.key);
       return acc;
     },
-    {} as Record<StoryStatus, Story[]>
+    {} as Record<string, Story[]>
   );
 
   if (isLoading && stories.length === 0) {
@@ -98,17 +97,46 @@ export function KanbanBoard() {
     );
   }
 
+  if (columns.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        No board selected
+      </div>
+    );
+  }
+
   return (
-    <div className="flex gap-4 overflow-x-auto px-4 h-full pb-4">
-      {BOARD_COLUMNS.map((status) => (
+    <div className="flex flex-col h-full">
+      {epics.length > 0 && (
+        <div className="px-4 pb-3 flex items-center gap-2">
+          <label className="text-sm text-gray-400">{epicNoun}:</label>
+          <select
+            className="bg-gray-800 text-sm text-gray-200 border border-gray-600 rounded px-2 py-1"
+            value={selectedEpicId ?? ''}
+            onChange={(e) => setSelectedEpic(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">All {epicNoun}s</option>
+            {epics.map((epic) => (
+              <option key={epic.id} value={epic.id}>
+                {epic.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex gap-4 overflow-x-auto px-4 flex-1 pb-4">
+      {columns.map((col) => (
         <KanbanColumn
-          key={status}
-          status={status}
-          stories={storiesByStatus[status]}
+          key={col.key}
+          columnKey={col.key}
+          label={col.label}
+          color={col.color}
+          stories={storiesByStatus[col.key] || []}
           selectedStoryId={selectedStoryId}
           onSelectStory={setSelectedStory}
         />
       ))}
+      </div>
     </div>
   );
 }

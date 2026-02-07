@@ -3,30 +3,30 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import Story, Task, Comment, AgentMessage, AgentType, StoryStatus, TaskStatus
+from app.db.models import Story, Task, Comment, AgentMessage, StoryStatus, PipelineConfig
 
 
 @pytest.mark.asyncio
-async def test_reset_clears_all_data(client: AsyncClient, test_session: AsyncSession):
+async def test_reset_clears_all_data(client: AsyncClient, test_session: AsyncSession, test_board: PipelineConfig):
     """Test that reset endpoint clears all data."""
     # Create test data
-    story = Story(title="Test Story", status=StoryStatus.BACKLOG)
+    story = Story(board_id=test_board.id, title="Test Story", status=StoryStatus.BACKLOG)
     test_session.add(story)
     await test_session.flush()
 
-    task = Task(story_id=story.id, title="Test Task", status=TaskStatus.DRAFT)
+    task = Task(story_id=story.id, title="Test Task", status="draft")
     test_session.add(task)
     await test_session.flush()
 
     comment = Comment(
         story_id=story.id,
-        agent_type=AgentType.PRODUCT_OWNER,
+        agent_type="product_owner",
         content="Test comment"
     )
     test_session.add(comment)
 
     message = AgentMessage(
-        from_agent=AgentType.DEVELOPER,
+        from_agent="developer",
         content="Test message",
         message_type="chat"
     )

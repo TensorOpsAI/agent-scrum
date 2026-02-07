@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { Bot, Loader2, Clock, CheckCircle } from 'lucide-react';
 import { useStoryStore } from '../../store/storyStore';
+import { usePipelineStore } from '../../store/pipelineStore';
 import { getAgentLabel, getAgentColor } from '../../types';
 import { AgentInfoModal } from '../modals/AgentInfoModal';
 import type { Agent, AgentType } from '../../types';
@@ -51,12 +52,13 @@ function AgentCard({ agent, onClick }: AgentCardProps) {
 
 export function AgentPanel() {
   const { agents, fetchAgents } = useStoryStore();
+  const { currentBoardId } = usePipelineStore();
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
 
-  // Fetch agents on mount
+  // Fetch agents when board changes
   useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
+    fetchAgents(currentBoardId ?? undefined);
+  }, [fetchAgents, currentBoardId]);
 
   return (
     <>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Key, Loader2, CheckCircle, AlertCircle, ExternalLink, Trash2, Play, Square, Pause, XCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { settingsApi, type AppSettings } from '../../api/client';
+import { usePipelineStore } from '../../store/pipelineStore';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isResetting, setIsResetting] = useState(false);
   const [isSwarmActionLoading, setIsSwarmActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const activeConfig = usePipelineStore((s) => s.activeConfig);
 
   useEffect(() => {
     if (isOpen) {
@@ -98,7 +100,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   const handleReset = async () => {
-    if (!confirm('Are you sure you want to delete ALL stories, tasks, and comments? This cannot be undone.')) {
+    if (!confirm('Are you sure you want to reset all data? All boards, stories, tasks, and comments will be deleted. Your settings will be preserved.')) {
       return;
     }
 
@@ -152,6 +154,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   if (!isOpen) return null;
+
+  const automationEnabled = activeConfig?.agent_automation === true;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -211,14 +215,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 )}>
                   {settings?.simulate_mode ? 'Simulation Mode' : 'Live Mode'}
                 </div>
-                <div className={clsx(
-                  'px-3 py-1.5 rounded-full',
-                  settings?.swarm_status === 'running' ? 'bg-green-900/30 text-green-400' :
-                  settings?.swarm_status === 'paused' ? 'bg-yellow-900/30 text-yellow-400' :
-                  'bg-red-900/30 text-red-400'
-                )}>
-                  Swarm: {settings?.swarm_status || 'stopped'}
-                </div>
+                {automationEnabled && (
+                  <div className={clsx(
+                    'px-3 py-1.5 rounded-full',
+                    settings?.swarm_status === 'running' ? 'bg-green-900/30 text-green-400' :
+                    settings?.swarm_status === 'paused' ? 'bg-yellow-900/30 text-yellow-400' :
+                    'bg-red-900/30 text-red-400'
+                  )}>
+                    Swarm: {settings?.swarm_status || 'stopped'}
+                  </div>
+                )}
               </div>
 
               {/* API Key Section */}
@@ -266,81 +272,85 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </p>
               </div>
 
-              {/* Swarm Controls */}
-              <div className="bg-gray-900 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-300 mb-3">Agent Swarm</h3>
-                <div className="flex gap-2">
-                  {settings?.swarm_status === 'stopped' ? (
-                    <button
-                      onClick={() => handleSwarmAction('start')}
-                      disabled={isSwarmActionLoading}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-                    >
-                      {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                      Start Swarm
-                    </button>
-                  ) : (
-                    <>
-                      {settings?.swarm_status === 'paused' ? (
-                        <button
-                          onClick={() => handleSwarmAction('resume')}
-                          disabled={isSwarmActionLoading}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-                        >
-                          {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                          Resume
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleSwarmAction('pause')}
-                          disabled={isSwarmActionLoading}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-yellow-600 hover:bg-yellow-700 text-white disabled:opacity-50"
-                        >
-                          {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
-                          Pause
-                        </button>
-                      )}
+              {/* Swarm Controls - only show when automation is enabled */}
+              {automationEnabled && (
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-300 mb-3">Agent Swarm</h3>
+                  <div className="flex gap-2">
+                    {settings?.swarm_status === 'stopped' ? (
                       <button
-                        onClick={() => handleSwarmAction('stop')}
+                        onClick={() => handleSwarmAction('start')}
                         disabled={isSwarmActionLoading}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                       >
-                        <Square className="w-4 h-4" />
-                        Stop
+                        {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                        Start Swarm
                       </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Simulation Mode */}
-              <div className="bg-gray-900 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-300">Simulation Mode</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">Use mock responses instead of Gemini API</p>
-                  </div>
-                  <button
-                    onClick={handleToggleSimulateMode}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                      settings?.simulate_mode ? 'bg-blue-600' : 'bg-gray-600'
+                    ) : (
+                      <>
+                        {settings?.swarm_status === 'paused' ? (
+                          <button
+                            onClick={() => handleSwarmAction('resume')}
+                            disabled={isSwarmActionLoading}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                          >
+                            {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                            Resume
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSwarmAction('pause')}
+                            disabled={isSwarmActionLoading}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-yellow-600 hover:bg-yellow-700 text-white disabled:opacity-50"
+                          >
+                            {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
+                            Pause
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleSwarmAction('stop')}
+                          disabled={isSwarmActionLoading}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                        >
+                          <Square className="w-4 h-4" />
+                          Stop
+                        </button>
+                      </>
                     )}
-                  >
-                    <span className={clsx(
-                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                      settings?.simulate_mode ? 'translate-x-6' : 'translate-x-1'
-                    )} />
-                  </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Simulation Mode - only show when automation is enabled */}
+              {automationEnabled && (
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-300">Simulation Mode</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Use mock responses instead of Gemini API</p>
+                    </div>
+                    <button
+                      onClick={handleToggleSimulateMode}
+                      className={clsx(
+                        'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                        settings?.simulate_mode ? 'bg-blue-600' : 'bg-gray-600'
+                      )}
+                    >
+                      <span className={clsx(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        settings?.simulate_mode ? 'translate-x-6' : 'translate-x-1'
+                      )} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Reset Data */}
               <div className="bg-red-900/20 border border-red-800/50 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-red-400">Reset All Data</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">Delete all stories, tasks, and comments</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Delete all boards and stories. Settings will be preserved.</p>
                   </div>
                   <button
                     onClick={handleReset}

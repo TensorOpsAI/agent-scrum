@@ -170,22 +170,10 @@ class A2ARouter:
         message_type: str = "a2a",
     ):
         """Record an A2A message in the chat for visibility."""
-        from app.db.models import AgentType
-
-        # Convert string IDs to AgentType enum
-        try:
-            from_type = AgentType(from_agent)
-        except ValueError:
-            from_type = AgentType.CLIENT  # Default for unknown
-
-        try:
-            to_type = AgentType(to_agent)
-        except ValueError:
-            to_type = None
-
+        # Store agent IDs as strings directly (columns are now String(50))
         message = AgentMessage(
-            from_agent=from_type,
-            to_agent=to_type,
+            from_agent=from_agent,
+            to_agent=to_agent,
             content=content,
             story_id=context.get("story_id"),
             task_id=context.get("task_id"),
@@ -195,19 +183,41 @@ class A2ARouter:
         await db.flush()
         await db.commit()
 
-        # Broadcast via WebSocket
+        # Broadcast via WebSocket with dynamic name lookup
+        from_name = await self._get_agent_display_name(from_agent)
+        to_name = await self._get_agent_display_name(to_agent) if to_agent else None
+
         await broadcast_agent_chat({
             "id": message.id,
             "from_agent": from_agent,
-            "from_agent_name": AGENT_NAMES.get(from_agent, from_agent),
+            "from_agent_name": from_name,
             "to_agent": to_agent,
-            "to_agent_name": AGENT_NAMES.get(to_agent, to_agent),
+            "to_agent_name": to_name,
             "content": content,
             "story_id": context.get("story_id"),
             "task_id": context.get("task_id"),
             "message_type": message_type,
             "created_at": message.created_at.isoformat(),
         })
+
+    async def _get_agent_display_name(self, agent_id: str) -> str:
+        """Get display name for an agent, checking static names then DB."""
+        # Check static names first
+        if agent_id in AGENT_NAMES:
+            return AGENT_NAMES[agent_id]
+        # Look up from DynamicAgent table
+        try:
+            from app.db.database import async_session_maker
+            from app.db.models import DynamicAgent
+            from sqlalchemy import select
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(DynamicAgent.name).where(DynamicAgent.id == agent_id)
+                )
+                name = result.scalar_one_or_none()
+                return name or agent_id.replace("_", " ").title()
+        except Exception:
+            return agent_id.replace("_", " ").title()
 
 
 # Global router instance

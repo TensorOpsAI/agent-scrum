@@ -3,26 +3,27 @@ Agent chat service - handles the "Slack" layer of agent communication.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import AgentMessage, AgentType
+from app.db.models import AgentMessage
 from app.api.websocket.manager import broadcast_agent_chat
 
 
 # Agent display names for natural chat
 AGENT_NAMES = {
-    AgentType.PRODUCT_OWNER: "Product Owner",
-    AgentType.TECH_LEAD: "Tech Lead",
-    AgentType.DEVELOPER: "Developer",
-    AgentType.CODE_REVIEWER: "Code Reviewer",
-    AgentType.QA: "QA",
-    AgentType.CLIENT: "Human",
+    "product_owner": "Product Owner",
+    "tech_lead": "Tech Lead",
+    "developer": "Developer",
+    "code_reviewer": "Code Reviewer",
+    "qa": "QA",
+    "scrum_master": "Scrum Master",
+    "client": "Human",
 }
 
 
 async def send_chat_message(
-    from_agent: AgentType,
+    from_agent: str,
     content: str,
     db: AsyncSession,
-    to_agent: AgentType | None = None,
+    to_agent: str | None = None,
     story_id: int | None = None,
     task_id: int | None = None,
     message_type: str = "chat",
@@ -43,10 +44,10 @@ async def send_chat_message(
     # Broadcast to connected clients
     await broadcast_agent_chat({
         "id": message.id,
-        "from_agent": from_agent.value,
-        "from_agent_name": AGENT_NAMES.get(from_agent, from_agent.value),
-        "to_agent": to_agent.value if to_agent else None,
-        "to_agent_name": AGENT_NAMES.get(to_agent) if to_agent else None,
+        "from_agent": from_agent,
+        "from_agent_name": AGENT_NAMES.get(from_agent, from_agent.replace("_", " ").title()),
+        "to_agent": to_agent,
+        "to_agent_name": AGENT_NAMES.get(to_agent, to_agent.replace("_", " ").title()) if to_agent else None,
         "content": content,
         "story_id": story_id,
         "task_id": task_id,

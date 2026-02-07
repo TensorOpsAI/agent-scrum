@@ -161,10 +161,100 @@ BUILTIN_TOOLS: dict[str, ToolDefinition] = {
         "capabilities": ["validate_config", "suggest_improvements", "check_syntax"],
         "is_builtin": True,
     },
+
+    # HR / Talent Acquisition tools
+    "resume_parser": {
+        "name": "Resume Parser",
+        "description": "Parses and extracts structured data from candidate resumes",
+        "category": "hr",
+        "capabilities": ["parse_resume", "extract_skills", "score_experience"],
+        "is_builtin": True,
+    },
+    "interview_scheduler": {
+        "name": "Interview Scheduler",
+        "description": "Schedules interviews and manages calendar logistics",
+        "category": "hr",
+        "capabilities": ["schedule_interview", "send_invites", "manage_availability"],
+        "is_builtin": True,
+    },
+    "candidate_scorer": {
+        "name": "Candidate Scorer",
+        "description": "Scores candidates against job requirements and team fit",
+        "category": "hr",
+        "capabilities": ["score_candidate", "rank_applicants", "generate_report"],
+        "is_builtin": True,
+    },
+    "background_checker": {
+        "name": "Background Checker",
+        "description": "Runs background and reference checks on candidates",
+        "category": "hr",
+        "capabilities": ["verify_employment", "check_references", "generate_report"],
+        "is_builtin": True,
+    },
+
+    # Sales tools
+    "lead_scorer": {
+        "name": "Lead Scorer",
+        "description": "Scores and qualifies sales leads based on fit and intent signals",
+        "category": "sales",
+        "capabilities": ["score_lead", "qualify_lead", "prioritize_pipeline"],
+        "is_builtin": True,
+    },
+    "proposal_generator": {
+        "name": "Proposal Generator",
+        "description": "Generates customized sales proposals and SOWs",
+        "category": "sales",
+        "capabilities": ["generate_proposal", "customize_template", "calculate_pricing"],
+        "is_builtin": True,
+    },
+    "crm_connector": {
+        "name": "CRM Connector",
+        "description": "Syncs deal data with CRM systems like Salesforce or HubSpot",
+        "category": "sales",
+        "capabilities": ["sync_deals", "update_pipeline", "log_activities"],
+        "is_builtin": True,
+    },
+    "contract_builder": {
+        "name": "Contract Builder",
+        "description": "Builds and manages sales contracts and agreements",
+        "category": "sales",
+        "capabilities": ["draft_contract", "track_signatures", "manage_terms"],
+        "is_builtin": True,
+    },
+
+    # Security / CISO tools
+    "threat_detector": {
+        "name": "Threat Detector",
+        "description": "Detects and classifies security threats and vulnerabilities",
+        "category": "infosec",
+        "capabilities": ["detect_threats", "classify_risk", "alert_team"],
+        "is_builtin": True,
+    },
+    "patch_manager": {
+        "name": "Patch Manager",
+        "description": "Manages security patch deployment and tracking",
+        "category": "infosec",
+        "capabilities": ["identify_patches", "schedule_deployment", "verify_installation"],
+        "is_builtin": True,
+    },
+    "compliance_auditor": {
+        "name": "Compliance Auditor",
+        "description": "Audits systems for regulatory compliance (SOC2, NIST, etc.)",
+        "category": "infosec",
+        "capabilities": ["audit_controls", "generate_evidence", "track_findings"],
+        "is_builtin": True,
+    },
+    "incident_tracker": {
+        "name": "Incident Tracker",
+        "description": "Tracks and manages security incidents through resolution",
+        "category": "infosec",
+        "capabilities": ["log_incident", "track_response", "generate_postmortem"],
+        "is_builtin": True,
+    },
 }
 
 # Default categories (custom tools can add more)
-DEFAULT_CATEGORIES = ["security", "code", "testing", "docs", "performance", "devops"]
+DEFAULT_CATEGORIES = ["security", "code", "testing", "docs", "performance", "devops", "hr", "sales", "infosec"]
 
 
 def get_builtin_tool(tool_id: str) -> ToolDefinition | None:

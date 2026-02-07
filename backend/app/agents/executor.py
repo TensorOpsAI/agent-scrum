@@ -16,6 +16,25 @@ from app.api.websocket.manager import broadcast_agent_activity, broadcast_agent_
 
 logger = logging.getLogger(__name__)
 
+# --- Swarm-active flag ---------------------------------------------------
+# When False, execute_agent() returns early so that no agent work runs
+# while the swarm is paused / stopped.  The flag is toggled by
+# ScrumSwarm.start/stop/pause/resume in graph.py.
+_swarm_active: bool = False
+
+
+def set_swarm_active(active: bool) -> None:
+    """Set whether the swarm is active (agents allowed to execute)."""
+    global _swarm_active
+    _swarm_active = active
+
+
+def is_swarm_active() -> bool:
+    """Check whether the swarm is active."""
+    return _swarm_active
+
+# -------------------------------------------------------------------------
+
 
 def random_delay(min_sec: float, max_sec: float) -> float:
     """Generate a random delay between min and max seconds."""
@@ -84,6 +103,11 @@ class AgentExecutor:
         context = context or {}
         logger.info(f"[EXECUTOR] execute_agent called. agent_id={agent_id}, message_len={len(message)}, context={context}")
 
+        # Block execution when swarm is paused / stopped
+        if not _swarm_active:
+            logger.info(f"[EXECUTOR] Swarm not active — skipping agent {agent_id}")
+            return {"response": "Swarm is not active — agent execution skipped.", "skipped": True}
+
         # Get the LangGraph agent
         agent = get_agent(agent_id)
         if not agent:
@@ -110,7 +134,8 @@ class AgentExecutor:
             # Execute the LangGraph agent
             logger.info(f"[EXECUTOR] Calling agent.ainvoke for {agent_id}...")
             result = await agent.ainvoke({
-                "messages": [HumanMessage(content=message)]
+                "messages": [HumanMessage(content=message)],
+                "context": context,
             })
             logger.info(f"[EXECUTOR] agent.ainvoke returned. Result keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
 

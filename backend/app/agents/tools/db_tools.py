@@ -7,9 +7,11 @@ import logging
 from typing import Optional
 from langchain_core.tools import tool
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db.database import async_session_maker
-from app.db.models import Story, Task, Comment, StoryStatus, TaskStatus, AgentType
+from app.db.models import Story, Task, Comment, Epic
+from app.pipeline.templates import get_valid_statuses
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +40,11 @@ async def get_story(story_id: int) -> dict:
 
         return {
             "id": story.id,
+            "board_id": story.board_id,
             "title": story.title,
             "description": story.description,
             "acceptance_criteria": story.acceptance_criteria,
-            "status": story.status.value,
+            "status": story.status,
             "priority": story.priority,
             "prd_content": story.prd_content,
         }
@@ -53,38 +56,43 @@ async def update_story_status(story_id: int, new_status: str) -> dict:
 
     Args:
         story_id: The ID of the story to update
-        new_status: The new status (backlog, ready_for_breakdown, in_breakdown,
-                   tasks_in_review, in_development, in_qa, done)
+        new_status: The new status. Must be a valid column key in the story's board.
 
     Returns:
         Success/failure message
     """
     async with async_session_maker() as db:
-        result = await db.execute(select(Story).where(Story.id == story_id))
+        result = await db.execute(
+            select(Story).where(Story.id == story_id).options(selectinload(Story.board))
+        )
         story = result.scalar_one_or_none()
 
         if not story:
             return {"error": f"Story {story_id} not found"}
 
-        try:
-            story.status = StoryStatus(new_status)
-            await db.commit()
-            await db.refresh(story)
+        # Validate against the story's board columns
+        board_config = {"columns": story.board.columns}
+        valid = get_valid_statuses(board_config)
+        if new_status not in valid:
+            return {"error": f"Invalid status: {new_status}. Valid: {valid}"}
 
-            # Broadcast via WebSocket for real-time updates
-            from app.api.websocket.manager import broadcast_story_updated
-            await broadcast_story_updated({
-                "id": story.id,
-                "title": story.title,
-                "description": story.description,
-                "acceptance_criteria": story.acceptance_criteria,
-                "status": story.status.value,
-                "priority": story.priority,
-            })
+        story.status = new_status
+        await db.commit()
+        await db.refresh(story)
 
-            return {"success": True, "message": f"Story {story_id} status updated to {new_status}"}
-        except ValueError:
-            return {"error": f"Invalid status: {new_status}"}
+        # Broadcast via WebSocket for real-time updates
+        from app.api.websocket.manager import broadcast_story_updated
+        await broadcast_story_updated({
+            "id": story.id,
+            "board_id": story.board_id,
+            "title": story.title,
+            "description": story.description,
+            "acceptance_criteria": story.acceptance_criteria,
+            "status": story.status,
+            "priority": story.priority,
+        })
+
+        return {"success": True, "message": f"Story {story_id} status updated to {new_status}"}
 
 
 @tool
@@ -92,8 +100,10 @@ async def create_story(
     title: str,
     description: str,
     acceptance_criteria: str,
+    board_id: int,
     priority: int = 1,
     prd_content: str = "",
+    epic_id: Optional[int] = None,
 ) -> dict:
     """Create a new user story.
 
@@ -101,22 +111,41 @@ async def create_story(
         title: The story title (e.g., "As a user, I want...")
         description: Detailed description of the story
         acceptance_criteria: List of acceptance criteria
+        board_id: The ID of the board this story belongs to
         priority: Priority level (1=highest, default=1)
         prd_content: Original PRD content if applicable
+        epic_id: Optional epic ID to group this story under
 
     Returns:
         The created story details
     """
-    logger.info(f"[TOOL:create_story] Called with title: {title[:50]}...")
+    logger.info(f"[TOOL:create_story] Called with title: {title[:50]}..., board_id: {board_id}")
     try:
         async with async_session_maker() as db:
+            # Get board to determine default status
+            from app.db.models import PipelineConfig
+            board_result = await db.execute(
+                select(PipelineConfig).where(PipelineConfig.id == board_id)
+            )
+            board = board_result.scalar_one_or_none()
+            if not board:
+                return {"error": f"Board {board_id} not found"}
+
+            # Use second column (ready_for_breakdown) for automated boards, first column otherwise
+            if board.agent_automation and len(board.columns) > 1:
+                default_status = board.columns[1]["key"]
+            else:
+                default_status = board.columns[0]["key"]
+
             story = Story(
+                board_id=board_id,
+                epic_id=epic_id,
                 title=title,
                 description=description,
                 acceptance_criteria=acceptance_criteria,
                 priority=priority,
                 prd_content=prd_content,
-                status=StoryStatus.READY_FOR_BREAKDOWN,
+                status=default_status,
             )
             db.add(story)
             await db.commit()
@@ -127,20 +156,22 @@ async def create_story(
             from app.api.websocket.manager import broadcast_story_created
             await broadcast_story_created({
                 "id": story.id,
+                "board_id": story.board_id,
                 "title": story.title,
                 "description": story.description,
                 "acceptance_criteria": story.acceptance_criteria,
-                "status": story.status.value,
+                "status": story.status,
                 "priority": story.priority,
             })
             logger.info(f"[TOOL:create_story] WebSocket broadcast sent for story {story.id}")
 
             return {
                 "id": story.id,
+                "board_id": story.board_id,
                 "title": story.title,
                 "description": story.description,
                 "acceptance_criteria": story.acceptance_criteria,
-                "status": story.status.value,
+                "status": story.status,
                 "priority": story.priority,
             }
     except Exception as e:
@@ -149,29 +180,29 @@ async def create_story(
 
 
 @tool
-async def list_stories_by_status(status: str) -> list[dict]:
+async def list_stories_by_status(status: str, board_id: Optional[int] = None) -> list[dict]:
     """List all stories with a specific status.
 
     Args:
         status: The status to filter by
+        board_id: Optional board ID to filter by
 
     Returns:
         List of stories with that status
     """
     async with async_session_maker() as db:
-        try:
-            status_enum = StoryStatus(status)
-        except ValueError:
-            return [{"error": f"Invalid status: {status}"}]
-
-        result = await db.execute(select(Story).where(Story.status == status_enum))
+        query = select(Story).where(Story.status == status)
+        if board_id is not None:
+            query = query.where(Story.board_id == board_id)
+        result = await db.execute(query)
         stories = result.scalars().all()
 
         return [
             {
                 "id": s.id,
+                "board_id": s.board_id,
                 "title": s.title,
-                "status": s.status.value,
+                "status": s.status,
                 "priority": s.priority,
             }
             for s in stories
@@ -207,8 +238,8 @@ async def get_task(task_id: int) -> dict:
             "description": task.description,
             "implementation_notes": task.implementation_notes,
             "test_scenarios": task.test_scenarios,
-            "status": task.status.value,
-            "assigned_agent": task.assigned_agent.value if task.assigned_agent else None,
+            "status": task.status,
+            "assigned_agent": task.assigned_agent,
         }
 
 
@@ -231,7 +262,7 @@ async def get_tasks_for_story(story_id: int) -> list[dict]:
                 "id": t.id,
                 "title": t.title,
                 "description": t.description,
-                "status": t.status.value,
+                "status": t.status,
                 "implementation_notes": t.implementation_notes,
                 "test_scenarios": t.test_scenarios,
             }
@@ -260,7 +291,7 @@ async def create_task(
             story_id=story_id,
             title=title,
             description=description,
-            status=TaskStatus.DRAFT,
+            status="draft",
         )
         db.add(task)
         await db.commit()
@@ -273,7 +304,7 @@ async def create_task(
             "story_id": task.story_id,
             "title": task.title,
             "description": task.description,
-            "status": task.status.value,
+            "status": task.status,
         })
 
         return {
@@ -281,7 +312,7 @@ async def create_task(
             "story_id": task.story_id,
             "title": task.title,
             "description": task.description,
-            "status": task.status.value,
+            "status": task.status,
         }
 
 
@@ -304,26 +335,23 @@ async def update_task_status(task_id: int, new_status: str) -> dict:
         if not task:
             return {"error": f"Task {task_id} not found"}
 
-        try:
-            task.status = TaskStatus(new_status)
-            await db.commit()
-            await db.refresh(task)
+        task.status = new_status
+        await db.commit()
+        await db.refresh(task)
 
-            # Broadcast via WebSocket for real-time updates
-            from app.api.websocket.manager import broadcast_task_updated
-            await broadcast_task_updated({
-                "id": task.id,
-                "story_id": task.story_id,
-                "title": task.title,
-                "description": task.description,
-                "status": task.status.value,
-                "implementation_notes": task.implementation_notes,
-                "test_scenarios": task.test_scenarios,
-            })
+        # Broadcast via WebSocket for real-time updates
+        from app.api.websocket.manager import broadcast_task_updated
+        await broadcast_task_updated({
+            "id": task.id,
+            "story_id": task.story_id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+            "implementation_notes": task.implementation_notes,
+            "test_scenarios": task.test_scenarios,
+        })
 
-            return {"success": True, "message": f"Task {task_id} status updated to {new_status}"}
-        except ValueError:
-            return {"error": f"Invalid status: {new_status}"}
+        return {"success": True, "message": f"Task {task_id} status updated to {new_status}"}
 
 
 @tool
@@ -355,7 +383,7 @@ async def update_task_implementation(task_id: int, implementation_notes: str) ->
             "story_id": task.story_id,
             "title": task.title,
             "description": task.description,
-            "status": task.status.value,
+            "status": task.status,
             "implementation_notes": task.implementation_notes,
             "test_scenarios": task.test_scenarios,
         })
@@ -392,7 +420,7 @@ async def update_task_test_scenarios(task_id: int, test_scenarios: str) -> dict:
             "story_id": task.story_id,
             "title": task.title,
             "description": task.description,
-            "status": task.status.value,
+            "status": task.status,
             "implementation_notes": task.implementation_notes,
             "test_scenarios": task.test_scenarios,
         })
@@ -411,12 +439,7 @@ async def list_tasks_by_status(status: str) -> list[dict]:
         List of tasks with that status
     """
     async with async_session_maker() as db:
-        try:
-            status_enum = TaskStatus(status)
-        except ValueError:
-            return [{"error": f"Invalid status: {status}"}]
-
-        result = await db.execute(select(Task).where(Task.status == status_enum))
+        result = await db.execute(select(Task).where(Task.status == status))
         tasks = result.scalars().all()
 
         return [
@@ -424,9 +447,98 @@ async def list_tasks_by_status(status: str) -> list[dict]:
                 "id": t.id,
                 "story_id": t.story_id,
                 "title": t.title,
-                "status": t.status.value,
+                "status": t.status,
             }
             for t in tasks
+        ]
+
+
+# ============================================================================
+# Epic Tools
+# ============================================================================
+
+@tool
+async def create_epic(title: str, board_id: int, description: str = "") -> dict:
+    """Create a new epic to group stories.
+
+    Args:
+        title: The epic title
+        board_id: The ID of the board this epic belongs to
+        description: Optional description
+
+    Returns:
+        The created epic details
+    """
+    async with async_session_maker() as db:
+        epic = Epic(
+            board_id=board_id,
+            title=title,
+            description=description,
+        )
+        db.add(epic)
+        await db.commit()
+        await db.refresh(epic)
+
+        return {
+            "id": epic.id,
+            "board_id": epic.board_id,
+            "title": epic.title,
+            "description": epic.description,
+            "status": epic.status,
+        }
+
+
+@tool
+async def get_epic(epic_id: int) -> dict:
+    """Fetch an epic by ID.
+
+    Args:
+        epic_id: The ID of the epic to fetch
+
+    Returns:
+        Dictionary with epic details.
+    """
+    async with async_session_maker() as db:
+        result = await db.execute(select(Epic).where(Epic.id == epic_id))
+        epic = result.scalar_one_or_none()
+
+        if not epic:
+            return {"error": f"Epic {epic_id} not found"}
+
+        return {
+            "id": epic.id,
+            "board_id": epic.board_id,
+            "title": epic.title,
+            "description": epic.description,
+            "status": epic.status,
+        }
+
+
+@tool
+async def list_epics(board_id: Optional[int] = None) -> list[dict]:
+    """List all epics, optionally filtered by board.
+
+    Args:
+        board_id: Optional board ID to filter by
+
+    Returns:
+        List of epics
+    """
+    async with async_session_maker() as db:
+        query = select(Epic)
+        if board_id is not None:
+            query = query.where(Epic.board_id == board_id)
+        result = await db.execute(query)
+        epics = result.scalars().all()
+
+        return [
+            {
+                "id": e.id,
+                "board_id": e.board_id,
+                "title": e.title,
+                "status": e.status,
+            }
+            for e in epics
         ]
 
 
@@ -453,14 +565,9 @@ async def add_comment(
         The created comment details
     """
     async with async_session_maker() as db:
-        try:
-            agent = AgentType(agent_type)
-        except ValueError:
-            return {"error": f"Invalid agent type: {agent_type}"}
-
         comment = Comment(
             content=content,
-            agent_type=agent,
+            agent_type=agent_type,  # String column - accepts any agent ID
             task_id=task_id,
             story_id=story_id,
         )
@@ -471,7 +578,7 @@ async def add_comment(
         return {
             "id": comment.id,
             "content": comment.content,
-            "agent_type": comment.agent_type.value,
+            "agent_type": comment.agent_type,
             "task_id": comment.task_id,
             "story_id": comment.story_id,
         }
@@ -497,7 +604,7 @@ async def get_task_comments(task_id: int) -> list[dict]:
             {
                 "id": c.id,
                 "content": c.content,
-                "agent_type": c.agent_type.value,
+                "agent_type": c.agent_type,
                 "created_at": c.created_at.isoformat(),
             }
             for c in comments

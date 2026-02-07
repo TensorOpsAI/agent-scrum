@@ -106,29 +106,30 @@ async def toggle_simulate_mode(enabled: bool = True):
 
 @router.post("/reset")
 async def reset_all_data(db: AsyncSession = Depends(get_db)):
-    """Reset all data - delete everything and re-seed default agents."""
+    """Reset the board and swarm. Preserves settings, API key, and pipeline config."""
     try:
         # Stop the swarm first
         await swarm.stop()
 
-        # Delete in order due to foreign key constraints
+        # Delete everything including boards (cascade deletes stories)
         await db.execute(text("DELETE FROM comments"))
         await db.execute(text("DELETE FROM tasks"))
         await db.execute(text("DELETE FROM stories"))
         await db.execute(text("DELETE FROM agent_messages"))
         await db.execute(text("DELETE FROM dynamic_agents"))
         await db.execute(text("DELETE FROM custom_tools"))
+        await db.execute(text("DELETE FROM pipeline_configs"))
         await db.commit()
 
-        # Re-seed default agents
-        created_count = await seed_default_agents(db)
+        # Re-seed default agents and default board
+        await seed_default_agents(db)
 
         # Restart the swarm
         await swarm.start()
 
         return {
             "success": True,
-            "message": f"All data has been reset. Created {created_count} default agents.",
+            "message": "All data has been reset.",
         }
     except Exception as e:
         await db.rollback()

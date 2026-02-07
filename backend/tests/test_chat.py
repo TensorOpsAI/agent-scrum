@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import AgentMessage, AgentType
+from app.db.models import AgentMessage
 from app.agents.chat import send_chat_message, ChatTemplates
 
 
@@ -18,17 +18,17 @@ async def test_get_chat_messages_empty(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_chat_messages_with_data(client: AsyncClient, test_session: AsyncSession):
     """Test getting chat messages after creating some."""
-    # Create test messages directly in DB
+    # Create test messages directly in DB (agent IDs are now strings)
     msg1 = AgentMessage(
-        from_agent=AgentType.PRODUCT_OWNER,
-        to_agent=AgentType.DEVELOPER,
+        from_agent="product_owner",
+        to_agent="developer",
         content="Hey team, I've created a new story!",
         story_id=1,
         message_type="announcement",
     )
     msg2 = AgentMessage(
-        from_agent=AgentType.DEVELOPER,
-        to_agent=AgentType.TECH_LEAD,
+        from_agent="developer",
+        to_agent="tech_lead",
         content="@Tech Lead, I've broken down the story into tasks. PTAL!",
         story_id=1,
         message_type="handoff",
@@ -64,7 +64,7 @@ async def test_get_chat_messages_limit(client: AsyncClient, test_session: AsyncS
     # Create 10 messages
     for i in range(10):
         msg = AgentMessage(
-            from_agent=AgentType.DEVELOPER,
+            from_agent="developer",
             content=f"Message {i}",
             message_type="chat",
         )
@@ -81,9 +81,9 @@ async def test_get_chat_messages_limit(client: AsyncClient, test_session: AsyncS
 async def test_chat_message_without_recipient(client: AsyncClient, test_session: AsyncSession):
     """Test chat message broadcast (no specific recipient)."""
     msg = AgentMessage(
-        from_agent=AgentType.QA,
+        from_agent="qa",
         to_agent=None,
-        content="All tests passed! 🎉",
+        content="All tests passed!",
         task_id=42,
         message_type="announcement",
     )
@@ -105,10 +105,10 @@ async def test_send_chat_message_persists(client: AsyncClient, test_session: Asy
     """Test that send_chat_message commits messages to the database."""
     # Use the send_chat_message function (which should commit)
     message = await send_chat_message(
-        from_agent=AgentType.PRODUCT_OWNER,
+        from_agent="product_owner",
         content="Test message from send_chat_message",
         db=test_session,
-        to_agent=AgentType.DEVELOPER,
+        to_agent="developer",
         story_id=1,
         message_type="test",
     )

@@ -8,6 +8,8 @@ Each agent has:
 Skills are for reasoning, tools are for doing.
 """
 import logging
+import random
+import re as _re
 from typing import Any, Optional
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage, AIMessage
@@ -22,6 +24,7 @@ from app.agents.tools.db_tools import (
     get_tasks_for_story,
     create_story,
     create_task,
+    create_epic,
     update_story_status,
     update_task_status,
     update_task_implementation,
@@ -89,6 +92,7 @@ class SimulatedAgent:
         """Simulate agent invocation with mock tool calls."""
         logger.info(f"[SIMULATED:{self.agent_id}] ainvoke called")
         messages = input_data.get("messages", [])
+        self._context = input_data.get("context", {})
         if not messages:
             logger.warning(f"[SIMULATED:{self.agent_id}] No messages provided")
             return {"messages": [AIMessage(content="No input provided.")]}
@@ -101,39 +105,49 @@ class SimulatedAgent:
         response_messages = []
         import re
 
+        # Parse role from agent_id (e.g., "developer_1" -> "developer")
+        role, _ = _parse_agent_id(self.agent_id)
+
         # Product Owner: Parse PRD and create stories
         # Only treat as PRD if it looks like actual requirements, not a chat message
-        if self.agent_id == "product_owner":
-            # Skip if it looks like a chat command (starts with @, very short, or is a question)
+        if role == "product_owner":
+            # Skip if it looks like a chat command - must be SHORT and match chat patterns
+            # Long messages (>200 chars) are likely PRDs, not chat
+            msg_lower = last_message.lower().strip()
             is_chat_message = (
                 last_message.strip().startswith("@") or
-                len(last_message) < 50 or
-                last_message.strip().endswith("?") or
-                "start " in last_message.lower() or
-                "please " in last_message.lower() or
-                "can you" in last_message.lower()
+                len(last_message) < 100 or  # Very short = likely chat
+                (len(last_message) < 300 and (  # Medium length + chat patterns = chat
+                    msg_lower.endswith("?") or
+                    msg_lower.startswith("please ") or
+                    msg_lower.startswith("can you") or
+                    msg_lower.startswith("start ") or
+                    msg_lower.startswith("hey ") or
+                    msg_lower.startswith("hi ")
+                ))
             )
 
             if is_chat_message:
-                response_content = f"[Simulation Mode] Product Owner acknowledges: {last_message[:50]}... (This looks like a chat message, not a PRD. Submit a PRD through the PRD form to create stories.)"
+                response_content = f"Product Owner acknowledges: {last_message[:50]}... (This looks like a chat message, not a PRD. Submit a PRD through the PRD form to create stories.)"
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
             logger.info(f"[SIMULATED:{self.agent_id}] Processing PRD content, will create stories")
             # This looks like a PRD - parse it and create stories
-            stories_created = await self._parse_prd_and_create_stories(last_message)
-            response_content = f"[Simulation Mode] Product Owner analyzed PRD and created {stories_created} user stories."
+            board_id = self._context.get("board_id")
+            stories_created = await self._parse_prd_and_create_stories(last_message, board_id=board_id)
+            response_content = f"Analyzed PRD and created {stories_created} user stories."
             response_messages.append(AIMessage(content=response_content))
             return {"messages": response_messages}
 
         # Developer: Break down story OR write implementation notes for task
-        if self.agent_id == "developer":
+        if role == "developer":
             # Check for task implementation first (more specific)
             task_match = re.search(r'task\s*#?(\d+)', last_message.lower())
             if task_match and "implementation" in last_message.lower():
                 task_id = int(task_match.group(1))
                 await self._write_implementation(task_id)
-                response_content = f"[Simulation Mode] Developer wrote implementation notes for task #{task_id}."
+                response_content = f"Wrote implementation notes for task #{task_id}."
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
@@ -142,45 +156,56 @@ class SimulatedAgent:
             if story_match:
                 story_id = int(story_match.group(1))
                 await self._breakdown_story(story_id)
-                response_content = f"[Simulation Mode] Developer broke down story #{story_id} into tasks."
+                response_content = f"Broke down story #{story_id} into tasks. Ready for review."
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
         # Tech Lead: Review tasks
-        if self.agent_id == "tech_lead":
+        if role == "tech_lead":
             story_match = re.search(r'story\s*#?(\d+)', last_message.lower())
             if story_match:
                 story_id = int(story_match.group(1))
-                await self._review_tasks(story_id)
-                response_content = f"[Simulation Mode] Tech Lead approved tasks for story #{story_id}."
+                passed, reason = await self._review_tasks(story_id)
+                if passed:
+                    response_content = f"Reviewed and approved tasks for story #{story_id}. Moving to development."
+                else:
+                    response_content = f"Task breakdown needs revision for story #{story_id}: {reason}."
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
         # Code Reviewer: Review implementation
-        if self.agent_id == "code_reviewer":
+        if role == "code_reviewer":
             task_match = re.search(r'task\s*#?(\d+)', last_message.lower())
             if task_match:
                 task_id = int(task_match.group(1))
-                await self._review_code(task_id)
-                response_content = f"[Simulation Mode] Code Reviewer approved task #{task_id}."
+                passed, reason = await self._review_code(task_id)
+                if passed:
+                    response_content = f"Code review complete for task #{task_id}. Approved, moving to QA."
+                else:
+                    response_content = f"Found issues in task #{task_id}: {reason}. Sent back for revision."
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
         # QA: Test task
-        if self.agent_id == "qa":
+        if role == "qa":
             task_match = re.search(r'task\s*#?(\d+)', last_message.lower())
             if task_match:
                 task_id = int(task_match.group(1))
-                await self._qa_test(task_id)
-                response_content = f"[Simulation Mode] QA passed task #{task_id}."
+                passed, reason = await self._qa_test(task_id)
+                if passed:
+                    response_content = f"All tests passed for task #{task_id}. Marking as done."
+                else:
+                    response_content = f"Tests failed for task #{task_id}: {reason}. Sending back for code review."
                 response_messages.append(AIMessage(content=response_content))
                 return {"messages": response_messages}
 
-        response_content = f"[Simulation Mode] {self.agent_id} processed: {last_message[:100]}..."
+        # Domain agent simulation - parse role from agent_id and look up simulation text
+        role, board_id = _parse_agent_id(self.agent_id)
+        response_content = await self._domain_simulation(role, board_id, last_message)
         response_messages.append(AIMessage(content=response_content))
         return {"messages": response_messages}
 
-    async def _parse_prd_and_create_stories(self, prd_content: str) -> int:
+    async def _parse_prd_and_create_stories(self, prd_content: str, board_id: int = None) -> int:
         """Parse PRD and create user stories."""
         import re
 
@@ -316,7 +341,7 @@ class SimulatedAgent:
                 if 30 < len(sent) < 300 and is_actionable(sent) and not is_intro_line(sent):
                     sentence_features.append(sent)
             if sentence_features:
-                features = sentence_features[:8]
+                features = sentence_features[:15]
                 logger.info(f"[SIMULATED:product_owner] Strategy 6 (sentences): found {len(features)} features")
 
         # Strategy 7: Split by paragraphs
@@ -363,8 +388,56 @@ class SimulatedAgent:
                 seen.add(f_lower)
                 unique_features.append(f)
 
-        features = unique_features[:8]  # Allow up to 8 stories
+        features = unique_features[:15]  # Allow up to 15 stories for thorough PRD breakdown
+
+        # If we have fewer than 10 features, derive additional stories from existing ones
+        # This ensures thorough coverage as a good PO would do
+        if len(features) < 10 and len(features) > 0:
+            derived_stories = []
+            for feature in features[:5]:  # Derive from first 5 features
+                # Add error handling story
+                derived_stories.append(f"Handle errors and edge cases for: {feature[:80]}")
+                # Add validation story
+                derived_stories.append(f"Input validation and data integrity for: {feature[:80]}")
+
+            # Add common cross-cutting stories
+            derived_stories.extend([
+                "User notification system for important events and updates",
+                "Settings and preferences management for users",
+                "Admin dashboard for monitoring and management",
+                "Search and filter functionality across the application",
+                "Data export and reporting capabilities",
+                "User onboarding and help documentation",
+                "Performance optimization and caching",
+                "Audit logging for security and compliance",
+            ])
+
+            # Add derived stories until we have at least 10
+            for derived in derived_stories:
+                if len(features) >= 10:
+                    break
+                d_lower = derived.lower()[:50]
+                if d_lower not in seen:
+                    seen.add(d_lower)
+                    features.append(derived)
+
         logger.info(f"[SIMULATED:product_owner] Extracted {len(features)} features: {[f[:50] for f in features]}")
+
+        # Auto-create an Epic to group these stories
+        epic_id = None
+        if board_id is not None:
+            try:
+                # Derive epic title from first feature or PRD content
+                epic_title = features[0][:80] if features else prd_content[:80]
+                epic_result = await create_epic.ainvoke({
+                    "title": epic_title,
+                    "board_id": board_id,
+                    "description": f"Auto-created from input ({len(features)} items)",
+                })
+                epic_id = epic_result.get("id")
+                logger.info(f"[SIMULATED:product_owner] Created epic #{epic_id}: {epic_title[:50]}")
+            except Exception as e:
+                logger.error(f"[SIMULATED:product_owner] Error creating epic: {e}", exc_info=True)
 
         stories_created = 0
         for i, feature in enumerate(features, 1):
@@ -372,13 +445,18 @@ class SimulatedAgent:
                 # Create a user story
                 title = f"As a user, I want {feature[:50]}..." if len(feature) > 50 else f"As a user, I want {feature}"
                 logger.info(f"[SIMULATED:product_owner] Creating story {i}: {title[:60]}...")
-                result = await create_story.ainvoke({
+                invoke_args = {
                     "title": title,
                     "description": f"[From PRD] {feature}",
                     "acceptance_criteria": f"- Feature is implemented as described\n- User can access the functionality\n- No errors occur during normal use",
                     "priority": i,
                     "prd_content": prd_content[:500],  # Store truncated PRD
-                })
+                }
+                if board_id is not None:
+                    invoke_args["board_id"] = board_id
+                if epic_id is not None:
+                    invoke_args["epic_id"] = epic_id
+                result = await create_story.ainvoke(invoke_args)
                 logger.info(f"[SIMULATED:product_owner] Story created: {result}")
                 stories_created += 1
             except Exception as e:
@@ -462,11 +540,26 @@ This task involves implementing the required functionality as specified.
         except Exception as e:
             logger.error(f"[SIMULATED:developer] Error writing implementation: {e}", exc_info=True)
 
-    async def _review_tasks(self, story_id: int):
-        """Review and approve tasks for a story."""
+    async def _review_tasks(self, story_id: int) -> tuple[bool, str]:
+        """Review and approve tasks for a story. May reject ~10% of the time."""
         try:
             tasks = await get_tasks_for_story.ainvoke({"story_id": story_id})
             logger.info(f"[SIMULATED:tech_lead] Found {len(tasks)} tasks for story #{story_id}")
+
+            # Build context from story + tasks for content-aware decision
+            story_result = await get_story.ainvoke({"story_id": story_id})
+            story_info = f"{story_result.get('title', '')} {story_result.get('description', '')}" if story_result else ""
+            passed, reason = self._should_pass("tech_lead", "review_tasks", story_info)
+
+            if not passed:
+                # Rejection: don't move tasks, add comment explaining
+                await add_comment.ainvoke({
+                    "content": f"Task breakdown needs revision: {reason}",
+                    "agent_type": "tech_lead",
+                    "story_id": story_id,
+                })
+                logger.info(f"[SIMULATED:tech_lead] Rejected tasks for story #{story_id}: {reason}")
+                return False, reason
 
             for task in tasks:
                 task_id = task["id"]
@@ -483,18 +576,36 @@ This task involves implementing the required functionality as specified.
                 "new_status": "in_development"
             })
             logger.info(f"[SIMULATED:tech_lead] Reviewed {len(tasks)} tasks for story #{story_id}, moved to in_development")
+            return True, ""
         except Exception as e:
             logger.error(f"[SIMULATED:tech_lead] Error reviewing tasks: {e}", exc_info=True)
+            return True, ""
 
-    async def _review_code(self, task_id: int):
-        """Review code and approve. Moves story to in_qa when first task reaches QA."""
+    async def _review_code(self, task_id: int) -> tuple[bool, str]:
+        """Review code. May reject ~20% of the time, sending task back to development."""
         try:
-            # Get task to find story_id
+            # Get task to find story_id and build context
             task_result = await get_task.ainvoke({"task_id": task_id})
             story_id = task_result.get("story_id") if task_result else None
+            task_info = f"{task_result.get('title', '')} {task_result.get('description', '')} {task_result.get('implementation_notes', '')}" if task_result else ""
+
+            passed, reason = self._should_pass("code_reviewer", "code_review", task_info)
+
+            if not passed:
+                await add_comment.ainvoke({
+                    "content": f"Code review found issues: {reason}. Sending back to development.",
+                    "agent_type": "code_reviewer",
+                    "task_id": task_id,
+                })
+                await update_task_status.ainvoke({
+                    "task_id": task_id,
+                    "new_status": "ready_for_development"
+                })
+                logger.info(f"[SIMULATED:code_reviewer] Task #{task_id} rejected: {reason}")
+                return False, reason
 
             await add_comment.ainvoke({
-                "content": "[Simulated] Code review passed. Implementation looks good.",
+                "content": "Code review passed. Implementation looks good.",
                 "agent_type": "code_reviewer",
                 "task_id": task_id,
             })
@@ -514,20 +625,43 @@ This task involves implementing the required functionality as specified.
                     })
                     logger.info(f"[SIMULATED:code_reviewer] Story #{story_id} moved to in_qa")
 
+            return True, ""
         except Exception as e:
             logger.error(f"[SIMULATED:code_reviewer] Error reviewing code: {e}", exc_info=True)
+            return True, ""
 
-    async def _qa_test(self, task_id: int):
-        """Run QA tests and pass. Also checks if story is complete."""
+    async def _qa_test(self, task_id: int) -> tuple[bool, str]:
+        """Run QA tests. May fail ~15% of the time, sending task back to code review."""
         try:
-            # Get task to find story_id
+            # Get task to find story_id and build context
             task_result = await get_task.ainvoke({"task_id": task_id})
             story_id = task_result.get("story_id") if task_result else None
+            task_info = f"{task_result.get('title', '')} {task_result.get('description', '')} {task_result.get('implementation_notes', '')}" if task_result else ""
 
-            # Write test scenarios
+            passed, reason = self._should_pass("qa", "qa_run", task_info)
+
+            if not passed:
+                # Write failed test scenarios
+                await update_task_test_scenarios.ainvoke({
+                    "task_id": task_id,
+                    "test_scenarios": f"Test Scenarios:\n1. Happy path test - PASS\n2. Edge case test - FAIL: {reason}\n3. Error handling test - PASS"
+                })
+                await add_comment.ainvoke({
+                    "content": f"Tests failed: {reason}. Sending back for code review.",
+                    "agent_type": "qa",
+                    "task_id": task_id,
+                })
+                await update_task_status.ainvoke({
+                    "task_id": task_id,
+                    "new_status": "code_review"
+                })
+                logger.info(f"[SIMULATED:qa] Task #{task_id} failed QA: {reason}")
+                return False, reason
+
+            # Write passing test scenarios
             await update_task_test_scenarios.ainvoke({
                 "task_id": task_id,
-                "test_scenarios": "[Simulated] Test Scenarios:\n1. Happy path test - PASS\n2. Edge case test - PASS\n3. Error handling test - PASS"
+                "test_scenarios": "Test Scenarios:\n1. Happy path test - PASS\n2. Edge case test - PASS\n3. Error handling test - PASS"
             })
 
             # Mark task as done
@@ -550,8 +684,410 @@ This task involves implementing the required functionality as specified.
                     })
                     logger.info(f"[SIMULATED:qa] All tasks complete! Story #{story_id} marked as done")
 
+            return True, ""
         except Exception as e:
             logger.error(f"[SIMULATED:qa] Error in QA test: {e}", exc_info=True)
+            return True, ""
+
+    async def _domain_simulation(self, role: str, board_id: int | None, message: str) -> str:
+        """Handle domain-specific agent simulation for non-software-dev boards.
+
+        This is the functional version that actually moves items through the pipeline:
+        1. Looks up the board's template and workflow
+        2. Adds a comment with simulation text
+        3. Moves the item to the next status
+        4. Creates sub-items (tasks) for story handlers if appropriate
+        """
+        import asyncio
+        from app.pipeline.templates import TEMPLATE_WORKFLOWS
+
+        # Get context from the swarm (story_id, task_id, action, board_id)
+        context = self._context or {}
+        story_id = context.get("story_id")
+        task_id = context.get("task_id")
+        action = context.get("action")
+        if not board_id:
+            board_id = context.get("board_id")
+
+        # Look up the board's template
+        template_id = None
+        if board_id:
+            try:
+                from app.db.database import async_session_maker
+                from app.db.models import PipelineConfig
+                from sqlalchemy import select
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(PipelineConfig.template_id).where(PipelineConfig.id == board_id)
+                    )
+                    template_id = result.scalar_one_or_none()
+            except Exception:
+                pass
+
+        if not template_id:
+            template_id = "software_dev"
+
+        # Look up simulation text for this role + action
+        domain_sims = DOMAIN_SIMULATIONS.get(template_id, {})
+        role_sims = domain_sims.get(role, {})
+        sim_text = role_sims.get(action) if action else None
+        if not sim_text:
+            # Fall back to first available simulation for this role
+            sim_text = next(iter(role_sims.values()), None) if role_sims else None
+        if not sim_text:
+            sim_text = f"{role.replace('_', ' ').title()} processed the item successfully."
+
+        # Determine if this is a story or task handler and find next_status
+        workflow = TEMPLATE_WORKFLOWS.get(template_id, {})
+        next_status = None
+        is_story_handler = False
+
+        if story_id and not task_id:
+            # Story handler — look up by action
+            for status_key, handler in workflow.get("story_handlers", {}).items():
+                if len(handler) >= 3 and handler[1] == action:
+                    next_status = handler[2]
+                    is_story_handler = True
+                    break
+        elif task_id:
+            # Task handler — look up by action
+            for status_key, handler in workflow.get("task_handlers", {}).items():
+                if len(handler) >= 3 and handler[1] == action:
+                    next_status = handler[2]
+                    break
+
+        # Simulate processing delay
+        await asyncio.sleep(1)
+
+        # --- Pass/Fail Decision ---
+        # Build item context for content-aware decision
+        item_data = message
+        if story_id and not task_id:
+            try:
+                story_result = await get_story.ainvoke({"story_id": story_id})
+                if story_result:
+                    item_data = f"{story_result.get('title', '')} {story_result.get('description', '')} {message}"
+            except Exception:
+                pass
+        elif task_id:
+            try:
+                task_result = await get_task.ainvoke({"task_id": task_id})
+                if task_result:
+                    item_data = f"{task_result.get('title', '')} {task_result.get('description', '')} {message}"
+            except Exception:
+                pass
+
+        passed, reason = self._should_pass(role, action or "", item_data)
+
+        if not passed:
+            # Use rejection text from DOMAIN_REJECTIONS if available
+            rejection_texts = DOMAIN_REJECTIONS.get(template_id, {}).get(role, {}).get(action, [])
+            reject_text = random.choice(rejection_texts) if rejection_texts else f"{role.replace('_', ' ').title()} review: {reason}. Not advancing."
+
+            # Add rejection comment
+            try:
+                if task_id:
+                    await add_comment.ainvoke({
+                        "content": reject_text,
+                        "agent_type": role,
+                        "task_id": task_id,
+                    })
+                elif story_id:
+                    await add_comment.ainvoke({
+                        "content": reject_text,
+                        "agent_type": role,
+                        "story_id": story_id,
+                    })
+            except Exception as e:
+                logger.error(f"[SIMULATED:{self.agent_id}] Error adding rejection comment: {e}")
+
+            # Move to rejection status instead of next_status
+            rejection_map = REJECTION_STATUSES.get(template_id, {})
+            handler_type = "story" if (story_id and not task_id) else "task"
+            reject_status = rejection_map.get(handler_type)
+
+            if reject_status:
+                try:
+                    if task_id:
+                        await update_task_status.ainvoke({
+                            "task_id": task_id,
+                            "new_status": reject_status,
+                        })
+                        logger.info(f"[SIMULATED:{self.agent_id}] Task #{task_id} rejected -> {reject_status}")
+                    elif story_id:
+                        await update_story_status.ainvoke({
+                            "story_id": story_id,
+                            "new_status": reject_status,
+                        })
+                        logger.info(f"[SIMULATED:{self.agent_id}] Story #{story_id} rejected -> {reject_status}")
+                except Exception as e:
+                    logger.error(f"[SIMULATED:{self.agent_id}] Error moving rejected item: {e}")
+
+            # Don't create sub-items on rejection
+            item_ref = f"#{task_id or story_id}" if (task_id or story_id) else ""
+            return f"{reject_text} {item_ref}".strip()
+
+        # --- Passed: existing behavior ---
+        # 1. Add a comment with the simulation text
+        try:
+            if task_id:
+                await add_comment.ainvoke({
+                    "content": sim_text,
+                    "agent_type": role,
+                    "task_id": task_id,
+                })
+            elif story_id:
+                await add_comment.ainvoke({
+                    "content": sim_text,
+                    "agent_type": role,
+                    "story_id": story_id,
+                })
+        except Exception as e:
+            logger.error(f"[SIMULATED:{self.agent_id}] Error adding comment: {e}")
+
+        # 2. Move the item to next_status
+        if next_status:
+            try:
+                if task_id:
+                    await update_task_status.ainvoke({
+                        "task_id": task_id,
+                        "new_status": next_status,
+                    })
+                    logger.info(f"[SIMULATED:{self.agent_id}] Task #{task_id} moved to {next_status}")
+                elif story_id:
+                    await update_story_status.ainvoke({
+                        "story_id": story_id,
+                        "new_status": next_status,
+                    })
+                    logger.info(f"[SIMULATED:{self.agent_id}] Story #{story_id} moved to {next_status}")
+            except Exception as e:
+                logger.error(f"[SIMULATED:{self.agent_id}] Error moving item: {e}")
+
+        # 3. For story handlers: create sub-items (tasks) if the board has tasks
+        if is_story_handler and story_id and next_status:
+            try:
+                from app.pipeline.templates import get_template_by_id
+                template = get_template_by_id(template_id)
+                if template and template.get("has_tasks"):
+                    # Only create tasks on the first story transition (e.g., applied -> phone_screen)
+                    existing_tasks = await get_tasks_for_story.ainvoke({"story_id": story_id})
+                    if not existing_tasks:
+                        sub_item_noun = template.get("sub_item_noun", "Task")
+                        # Create 2-3 sub-items relevant to the domain
+                        sub_items = self._get_domain_sub_items(template_id, role, action)
+                        for sub_title, sub_desc in sub_items:
+                            await create_task.ainvoke({
+                                "story_id": story_id,
+                                "title": sub_title,
+                                "description": sub_desc,
+                            })
+                        logger.info(f"[SIMULATED:{self.agent_id}] Created {len(sub_items)} {sub_item_noun}s for story #{story_id}")
+            except Exception as e:
+                logger.error(f"[SIMULATED:{self.agent_id}] Error creating sub-items: {e}")
+
+        item_ref = f"#{task_id or story_id}" if (task_id or story_id) else ""
+        return f"{sim_text} {item_ref}".strip()
+
+    def _get_domain_sub_items(self, template_id: str, role: str, action: str) -> list[tuple[str, str]]:
+        """Get domain-specific sub-items to create for a story."""
+        sub_items_map = {
+            "talent_acquisition": [
+                ("Review resume and qualifications", "Check candidate's experience and skills against job requirements"),
+                ("Verify references", "Contact provided references for background verification"),
+                ("Schedule next round", "Coordinate calendar availability for interview panel"),
+            ],
+            "sales": [
+                ("Research company background", "Gather information about the prospect's industry, size, and needs"),
+                ("Prepare talking points", "Create customized pitch addressing identified pain points"),
+                ("Follow up on action items", "Track and complete post-meeting deliverables"),
+            ],
+            "ciso": [
+                ("Document threat indicators", "Record IOCs, attack vectors, and affected systems"),
+                ("Assess impact scope", "Determine which systems and data are affected"),
+                ("Prepare mitigation plan", "Outline steps to contain and remediate the issue"),
+            ],
+        }
+        return sub_items_map.get(template_id, [
+            ("Prepare materials", "Gather necessary documentation and information"),
+            ("Execute action", "Perform the primary work for this step"),
+        ])
+
+    def _should_pass(self, role: str, action: str, item_data: str) -> tuple[bool, str]:
+        """Content-aware decision engine that determines if an item should pass or fail.
+
+        Reads item description/title and applies domain-specific heuristics plus
+        randomness to produce realistic pass/fail outcomes.
+
+        Returns (passed, reason) where reason explains the outcome.
+        """
+        item_lower = (item_data or "").lower()
+
+        # --- Talent Acquisition ---
+        if action == "screen_resume":
+            base_rate = 0.75
+            # Parse experience years from description
+            exp_match = _re.search(r'(\d+)\s*(?:\+\s*)?(?:years?|yrs?)\b', item_lower)
+            if exp_match:
+                years = int(exp_match.group(1))
+                if years < 3:
+                    base_rate -= 0.30
+                elif years >= 7:
+                    base_rate += 0.10
+            # Check for missing key skill signals
+            if any(w in item_lower for w in ["no experience", "career change", "entry level", "intern"]):
+                base_rate -= 0.25
+            if any(w in item_lower for w in ["senior", "lead", "principal", "staff"]):
+                base_rate += 0.10
+            base_rate = max(0.15, min(base_rate, 0.95))
+            if random.random() > base_rate:
+                reasons = [
+                    "Candidate lacks required experience level for this role",
+                    "Key technical skills missing from candidate profile",
+                    "Experience doesn't align with position requirements",
+                    "Insufficient domain expertise for the role",
+                ]
+                return False, random.choice(reasons)
+            return True, "Resume meets requirements"
+
+        if action == "phone_screen":
+            if random.random() > 0.80:
+                reasons = [
+                    "Salary expectations significantly exceed budget",
+                    "Candidate's timeline doesn't align with hiring needs",
+                    "Communication skills below requirements for the role",
+                    "Candidate withdrew from the process",
+                ]
+                return False, random.choice(reasons)
+            return True, "Phone screen passed"
+
+        if action in ("evaluate", "review_feedback"):
+            if random.random() > 0.85:
+                reasons = [
+                    "Mixed interviewer feedback — not a strong enough signal",
+                    "Culture fit concerns raised by panel",
+                    "Technical depth didn't meet bar for the level",
+                    "Candidate underperformed on system design exercise",
+                ]
+                return False, random.choice(reasons)
+            return True, "Evaluation positive"
+
+        if action == "prepare_offer":
+            if random.random() > 0.90:
+                reasons = [
+                    "Candidate declined to proceed with offer",
+                    "Budget constraints prevent competitive offer",
+                    "Candidate accepted another offer",
+                ]
+                return False, random.choice(reasons)
+            return True, "Offer approved"
+
+        # --- Software Dev ---
+        if action == "code_review":
+            base_rate = 0.80
+            if any(w in item_lower for w in ["hack", "workaround", "todo", "fixme", "temporary"]):
+                base_rate -= 0.20
+            if random.random() > base_rate:
+                reasons = [
+                    "Missing error handling for edge cases",
+                    "Code needs refactoring — high cyclomatic complexity",
+                    "Security concern: input not properly sanitized",
+                    "Doesn't follow established patterns in the codebase",
+                    "Missing unit tests for critical path",
+                ]
+                return False, random.choice(reasons)
+            return True, "Code review passed"
+
+        if action in ("qa_run", "qa_scenarios"):
+            base_rate = 0.85
+            if any(w in item_lower for w in ["complex", "integration", "migration", "concurrent"]):
+                base_rate -= 0.15
+            if random.random() > base_rate:
+                reasons = [
+                    "Edge case failure in boundary conditions",
+                    "Regression detected in related functionality",
+                    "Performance degradation under load",
+                    "Intermittent failure in async operations",
+                    "Acceptance criteria not fully met",
+                ]
+                return False, random.choice(reasons)
+            return True, "All tests passed"
+
+        if action == "review_tasks":
+            if random.random() > 0.90:
+                reasons = [
+                    "Unclear acceptance criteria on several tasks",
+                    "Missing non-functional requirements",
+                    "Task granularity too coarse — needs further breakdown",
+                    "Dependencies between tasks not properly identified",
+                ]
+                return False, random.choice(reasons)
+            return True, "Tasks approved"
+
+        # --- Sales ---
+        if action == "qualify_lead":
+            base_rate = 0.80
+            if any(w in item_lower for w in ["small budget", "low budget", "limited budget"]):
+                base_rate -= 0.20
+            if "asap" in item_lower and any(w in item_lower for w in ["small", "startup", "early"]):
+                base_rate -= 0.15
+            if any(w in item_lower for w in ["enterprise", "fortune 500", "large"]):
+                base_rate += 0.10
+            base_rate = max(0.20, min(base_rate, 0.95))
+            if random.random() > base_rate:
+                reasons = [
+                    "Budget doesn't meet minimum deal threshold",
+                    "No clear decision-maker identified",
+                    "Timeline doesn't align with our delivery capacity",
+                    "Requirements outside our product capabilities",
+                ]
+                return False, random.choice(reasons)
+            return True, "Lead qualified"
+
+        if action == "negotiate":
+            if random.random() > 0.85:
+                reasons = [
+                    "Terms rejected by prospect's legal team",
+                    "Prospect went with a competitor",
+                    "Deal stalled — champion left the company",
+                    "Pricing couldn't be agreed upon",
+                ]
+                return False, random.choice(reasons)
+            return True, "Negotiation successful"
+
+        if action == "review_deal":
+            if random.random() > 0.90:
+                reasons = [
+                    "Insufficient margin on proposed deal",
+                    "Risk assessment too high for deal size",
+                    "Non-standard terms require executive approval",
+                ]
+                return False, random.choice(reasons)
+            return True, "Deal approved"
+
+        # --- CISO ---
+        if action in ("audit", "compliance_review"):
+            if random.random() > 0.80:
+                reasons = [
+                    "Non-compliant controls found during audit",
+                    "Documentation gaps in evidence collection",
+                    "Policy violations detected in access logs",
+                    "Remediation evidence insufficient",
+                ]
+                return False, random.choice(reasons)
+            return True, "Audit passed"
+
+        if action == "verify_mitigation":
+            if random.random() > 0.85:
+                reasons = [
+                    "Vulnerability still exploitable via alternate vector",
+                    "Patch did not fully address the root cause",
+                    "Regression introduced by security fix",
+                ]
+                return False, random.choice(reasons)
+            return True, "Mitigation verified"
+
+        # Default: pass
+        return True, ""
 
 
 # ============================================================================
@@ -591,12 +1127,17 @@ Use these tools to accomplish your work:
 ## Your Workflow
 When given a PRD (Product Requirements Document):
 1. Identify ALL distinct features/capabilities mentioned
-2. For EACH feature, create a separate story using create_story()
-3. Write acceptance criteria focused on user outcomes, not implementation
-4. Prioritize by business value (most critical = priority 1)
+2. Be THOROUGH - look for explicit AND implicit requirements
+3. For EACH feature, create a separate story using create_story()
+4. Write acceptance criteria focused on user outcomes, not implementation
+5. Prioritize by business value (most critical = priority 1)
 
 ## Guidelines
-- Create MULTIPLE stories from a PRD (one per distinct feature/capability)
+- Create AT LEAST 10 stories from a PRD - be elaborate and thorough
+- Break down large features into multiple smaller stories
+- Look for hidden requirements: error handling, edge cases, settings, notifications
+- Consider user types: admins, regular users, guests - each may need separate stories
+- Think about CRUD: create/read/update/delete are often separate stories
 - Story format: "As a [user], I want [feature], so that [benefit]"
 - Acceptance criteria: "Given... When... Then..." or bullet points
 - Focus on WHAT users can do, not HOW developers should code it
@@ -959,10 +1500,195 @@ def create_scrum_master_agent():
 
 
 # ============================================================================
+# DOMAIN-SPECIFIC SIMULATIONS
+# ============================================================================
+# Maps (template_id, role, action) -> simulated response text
+
+DOMAIN_SIMULATIONS = {
+    "software_dev": {
+        "product_owner": {
+            "parse_prd": "Analyzed PRD and created user stories with acceptance criteria.",
+        },
+        "developer": {
+            "breakdown": "Broke down story into implementable tasks with descriptions.",
+            "implementation": "Wrote detailed implementation notes for the task.",
+        },
+        "tech_lead": {
+            "review_tasks": "Reviewed task breakdown. All tasks approved and moved to ready for development.",
+        },
+        "code_reviewer": {
+            "code_review": "Code review passed. Implementation looks good, no issues found.",
+        },
+        "qa": {
+            "qa_scenarios": "Created comprehensive test scenarios covering happy path and edge cases.",
+            "qa_run": "All tests passed. Task verified and marked as done.",
+        },
+    },
+    "talent_acquisition": {
+        "recruiter": {
+            "screen_resume": "Reviewed candidate resume. 5 years experience in the field. Skills match requirements. Recommending for phone screen.",
+            "phone_screen": "Conducted 30-min phone screen. Strong communication skills. Technical knowledge verified. Moving to interview stage.",
+        },
+        "interview_coordinator": {
+            "schedule_interview": "Scheduled panel interview with 3 team members for Thursday 2PM. Sent calendar invites and prep materials.",
+            "conduct": "Coordinated interview logistics. All interviewers confirmed. Room and video link set up.",
+        },
+        "hiring_manager": {
+            "evaluate": "Reviewed candidate profile. Technical skills align with team needs. Cultural fit assessment: positive. Approved for next round.",
+            "review_feedback": "Reviewed all interviewer feedback. Consensus is positive. Proceeding to offer stage.",
+        },
+        "hr_coordinator": {
+            "prepare_offer": "Prepared competitive offer package. Drafted offer letter with benefits summary. Pending approval.",
+            "verify": "Completed background check verification. All references checked. Clear to proceed.",
+            "finalize": "Finalized onboarding package. Start date confirmed. Welcome materials prepared.",
+        },
+        "sourcing_specialist": {
+            "source": "Sourced 15 potential candidates from job boards and LinkedIn. 8 match core requirements.",
+        },
+    },
+    "sales": {
+        "account_executive": {
+            "qualify_lead": "Completed discovery call. Identified 3 pain points. Budget confirmed. Decision timeline: 30 days.",
+            "create_proposal": "Built custom proposal addressing key requirements. Included ROI analysis showing 3x return.",
+            "demo": "Delivered product demo to 4 stakeholders. Strong positive feedback from CTO. Next step: POC.",
+        },
+        "solutions_engineer": {
+            "build_poc": "Built custom demo environment. Addressed 5 technical requirements. POC ready for delivery.",
+        },
+        "contract_specialist": {
+            "negotiate": "Reviewed contract terms. Applied standard MSA template. Sent for legal review.",
+            "draft_contract": "Drafted service agreement with negotiated terms. Pending legal review.",
+            "finalize_contract": "Contract finalized. All parties signed. Deal closed successfully.",
+        },
+        "sales_manager": {
+            "review_deal": "Reviewed deal pipeline. Approved 15% discount. Stage gate passed.",
+        },
+        "lead_generator": {
+            "generate": "Generated 20 qualified leads from inbound marketing campaigns.",
+        },
+    },
+    "ciso": {
+        "threat_analyst": {
+            "assess_threat": "Analyzed threat vector. CVSS score: 7.8 (High). Attack surface: external-facing API. Recommending immediate mitigation.",
+        },
+        "security_engineer": {
+            "mitigate": "Deployed WAF rule to block exploit vector. Applied security patches to 12 affected servers. Monitoring for anomalies.",
+            "implement_control": "Implemented access control policy. Updated firewall rules. Deployed IDS signatures.",
+            "deploy_fix": "Deployed security fix to production. Verified patch integrity. No service disruption.",
+        },
+        "compliance_officer": {
+            "audit": "Mapped risk to SOC2 CC6.1 control. Generated compliance evidence report. 2 findings need remediation.",
+            "compliance_review": "Reviewed mitigation for regulatory compliance. Controls align with NIST CSF. Documentation updated.",
+        },
+        "incident_responder": {
+            "verify_mitigation": "Verified mitigation effectiveness. Ran penetration test against patched endpoint. No vulnerabilities detected.",
+        },
+        "risk_manager": {
+            "assess_residual": "Residual risk score reduced from 7.8 to 2.1 after mitigation. Accepted within risk tolerance. Moving to monitoring.",
+        },
+    },
+}
+
+
+# ============================================================================
+# REJECTION STATUSES & DOMAIN REJECTION TEXTS
+# ============================================================================
+# Maps template_id -> { handler_type -> rejection target status }
+# For story handlers: where rejected stories go
+# For task handlers: where rejected tasks go
+
+REJECTION_STATUSES = {
+    "talent_acquisition": {"story": "sourced", "task": None},
+    "sales": {"story": "closed_lost", "task": None},
+    "ciso": {"story": "mitigating", "task": "identified"},
+}
+
+# Rejection-specific response texts keyed by (template_id, role, action)
+DOMAIN_REJECTIONS = {
+    "talent_acquisition": {
+        "recruiter": {
+            "screen_resume": [
+                "Resume review complete. Candidate lacks required experience level for this role. Not advancing.",
+                "Screening complete. Key technical skills missing from profile. Moving back to sourced.",
+                "Resume doesn't demonstrate sufficient domain expertise. Not proceeding.",
+            ],
+            "phone_screen": [
+                "Phone screen complete. Salary expectations significantly exceed budget. Not proceeding.",
+                "Phone screen revealed timeline conflict. Candidate unavailable for required start date.",
+                "Communication skills below threshold for this customer-facing role. Not advancing.",
+            ],
+        },
+        "hiring_manager": {
+            "evaluate": [
+                "Evaluation complete. Technical depth didn't meet the bar for this level. Not advancing.",
+                "Panel feedback mixed. Culture fit concerns raised. Not proceeding to next round.",
+                "Candidate underperformed on system design exercise. Not moving forward.",
+            ],
+            "review_feedback": [
+                "Reviewed all interviewer feedback. Consensus is not strong enough. Not extending offer.",
+                "Mixed feedback from panel. Technical skills don't justify the level requested.",
+                "Feedback review complete. Concerns about long-term retention. Declining to proceed.",
+            ],
+        },
+        "hr_coordinator": {
+            "prepare_offer": [
+                "Candidate declined to proceed with our offer timeline.",
+                "Budget constraints prevent a competitive offer at this level.",
+                "Candidate accepted a competing offer before we could finalize.",
+            ],
+        },
+    },
+    "sales": {
+        "account_executive": {
+            "qualify_lead": [
+                "Discovery call complete. Budget doesn't meet minimum deal threshold. Marking as lost.",
+                "No clear decision-maker identified after multiple outreach attempts. Disqualifying.",
+                "Requirements fall outside our product capabilities. Not a fit.",
+            ],
+        },
+        "contract_specialist": {
+            "negotiate": [
+                "Terms rejected by prospect's legal team. Unable to reach agreement. Deal lost.",
+                "Prospect chose a competitor after final negotiations. Moving to closed lost.",
+                "Deal stalled — champion left the company. No path forward.",
+            ],
+        },
+        "sales_manager": {
+            "review_deal": [
+                "Insufficient margin on proposed deal terms. Cannot approve at current pricing.",
+                "Risk assessment too high relative to deal size. Needs restructuring.",
+                "Non-standard terms flagged by legal. Deal requires executive review.",
+            ],
+        },
+    },
+    "ciso": {
+        "compliance_officer": {
+            "audit": [
+                "Audit found non-compliant controls. Sending back for additional mitigation.",
+                "Documentation gaps in evidence collection. Remediation needed before approval.",
+                "Policy violations detected in access logs. Cannot certify compliance yet.",
+            ],
+            "compliance_review": [
+                "Compliance review identified outstanding regulatory gaps. Back to mitigation.",
+                "Controls do not yet meet NIST CSF requirements. Additional work needed.",
+            ],
+        },
+        "incident_responder": {
+            "verify_mitigation": [
+                "Vulnerability still exploitable via alternate attack vector. Mitigation incomplete.",
+                "Penetration test found the patch did not fully address root cause. Back to mitigation.",
+                "Regression introduced by security fix. Additional remediation required.",
+            ],
+        },
+    },
+}
+
+
+# ============================================================================
 # AGENT REGISTRY
 # ============================================================================
 
-# Map of agent IDs to their factory functions
+# Map of built-in agent roles to their factory functions
 AGENT_FACTORIES = {
     "product_owner": create_product_owner_agent,
     "tech_lead": create_tech_lead_agent,
@@ -1000,17 +1726,42 @@ AGENT_SKILLS = {
 }
 
 
+def _parse_agent_id(agent_id: str) -> tuple[str, int | None]:
+    """Parse agent_id like 'recruiter_3' into (role, board_id).
+
+    Returns (role, board_id) or (agent_id, None) if not a board-scoped agent.
+    """
+    parts = agent_id.rsplit("_", 1)
+    if len(parts) == 2 and parts[1].isdigit():
+        return parts[0], int(parts[1])
+    return agent_id, None
+
+
 def get_agent(agent_id: str):
-    """Get an agent instance by ID."""
-    factory = AGENT_FACTORIES.get(agent_id)
+    """Get an agent instance by ID.
+
+    For board-scoped agents like 'developer_1', extracts the role and
+    creates the appropriate agent (built-in factory or domain SimulatedAgent).
+    """
+    role, board_id = _parse_agent_id(agent_id)
+
+    # Try built-in factory first (by role)
+    factory = AGENT_FACTORIES.get(role)
     if factory:
-        return factory()
-    return None
+        agent = factory()
+        # Override the agent_id for board-scoped agents
+        if hasattr(agent, 'agent_id'):
+            agent.agent_id = agent_id
+        return agent
+
+    # Domain agent - create a SimulatedAgent with domain context
+    return SimulatedAgent(agent_id, tools=[], system_prompt="")
 
 
 def get_agent_skills(agent_id: str) -> list[dict]:
     """Get the skills list for an agent (for A2A discovery)."""
-    return AGENT_SKILLS.get(agent_id, [])
+    role, _ = _parse_agent_id(agent_id)
+    return AGENT_SKILLS.get(role, [])
 
 
 def list_available_agents() -> list[str]:

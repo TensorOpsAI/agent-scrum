@@ -3,7 +3,8 @@ Agents API - Unified endpoint for all agents (from database).
 
 All agents are stored in the database and can be added/removed dynamically.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -15,12 +16,17 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 @router.get("")
-async def list_agents(db: AsyncSession = Depends(get_db)):
+async def list_agents(
+    board_id: Optional[int] = Query(None, description="Filter agents by board ID"),
+    db: AsyncSession = Depends(get_db),
+):
     """List all agents from the database with their current status."""
     # Get all active agents from database
-    result = await db.execute(
-        select(DynamicAgent).where(DynamicAgent.is_active == True).order_by(DynamicAgent.created_at)
-    )
+    query = select(DynamicAgent).where(DynamicAgent.is_active == True)
+    if board_id is not None:
+        query = query.where(DynamicAgent.board_id == board_id)
+    query = query.order_by(DynamicAgent.created_at)
+    result = await db.execute(query)
     db_agents = result.scalars().all()
 
     agents = []
@@ -32,7 +38,7 @@ async def list_agents(db: AsyncSession = Depends(get_db)):
 
         agents.append({
             "id": agent.id,
-            "type": agent.id,
+            "type": agent.role or agent.id,
             "name": agent.name,
             "description": agent.description or "",
             "status": status,
@@ -61,7 +67,7 @@ async def get_agent_info(agent_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "id": agent.id,
-        "type": agent.id,
+        "type": agent.role or agent.id,
         "name": agent.name,
         "description": agent.description or "",
         "skills": agent.skills or [],
@@ -88,7 +94,7 @@ async def get_agent_status(agent_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "id": agent.id,
-        "type": agent.id,
+        "type": agent.role or agent.id,
         "name": agent.name,
         "status": status,
         "current_task": current_task,

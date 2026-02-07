@@ -2,12 +2,14 @@ import pytest
 import asyncio
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from app.main import app
 from app.db.database import Base, get_db
 from app.config import get_settings
 from app.db.seed import seed_default_agents, DEFAULT_AGENTS
+from app.db.models import PipelineConfig
 
 # Use in-memory SQLite for tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -65,6 +67,16 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
     async with async_session_maker() as session:
         yield session
+
+
+@pytest.fixture(scope="function")
+async def test_board(test_session: AsyncSession) -> PipelineConfig:
+    """Return the default board that was seeded during engine setup."""
+    result = await test_session.execute(
+        select(PipelineConfig).limit(1)
+    )
+    board = result.scalar_one()
+    return board
 
 
 @pytest.fixture(scope="function")
