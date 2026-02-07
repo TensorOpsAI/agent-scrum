@@ -12,6 +12,7 @@ class StoryBase(BaseModel):
 
 class StoryCreate(StoryBase):
     board_id: int
+    epic_id: Optional[int] = None
     prd_content: Optional[str] = None
 
 
@@ -30,6 +31,7 @@ class StoryStatusTransition(BaseModel):
 class StoryResponse(StoryBase):
     id: int
     board_id: int
+    epic_id: Optional[int] = None
     status: str
     prd_content: Optional[str] = None
     created_at: datetime

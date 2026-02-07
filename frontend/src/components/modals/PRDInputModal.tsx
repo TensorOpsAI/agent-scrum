@@ -15,6 +15,11 @@ export function PRDInputModal({ isOpen, onClose }: PRDInputModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentBoardId = usePipelineStore((s) => s.currentBoardId);
+  const currentBoard = usePipelineStore((s) => s.currentBoard);
+
+  const inputNoun = currentBoard?.input_noun ?? 'PRD';
+  const inputPlaceholder = currentBoard?.input_placeholder ??
+    `Paste your ${inputNoun} here...`;
 
   if (!isOpen) return null;
 
@@ -31,8 +36,8 @@ export function PRDInputModal({ isOpen, onClose }: PRDInputModalProps) {
       setTitle('');
       onClose();
     } catch (err) {
-      setError('Failed to submit PRD. Please try again.');
-      console.error('Error submitting PRD:', err);
+      setError(`Failed to submit ${inputNoun}. Please try again.`);
+      console.error(`Error submitting ${inputNoun}:`, err);
     } finally {
       setIsSubmitting(false);
     }
@@ -52,7 +57,7 @@ export function PRDInputModal({ isOpen, onClose }: PRDInputModalProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
           <div className="flex items-center gap-3">
             <FileText className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-white">Submit PRD</h2>
+            <h2 className="text-lg font-semibold text-white">Submit {inputNoun}</h2>
           </div>
           <button
             onClick={onClose}
@@ -77,7 +82,7 @@ export function PRDInputModal({ isOpen, onClose }: PRDInputModalProps) {
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter a title for this PRD..."
+                placeholder={`Enter a title for this ${inputNoun}...`}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -87,23 +92,13 @@ export function PRDInputModal({ isOpen, onClose }: PRDInputModalProps) {
                 htmlFor="content"
                 className="block text-sm font-medium text-gray-300 mb-2"
               >
-                PRD Content
+                {inputNoun} Content
               </label>
               <textarea
                 id="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Paste your Product Requirements Document here...
-
-Example:
-# Feature: User Authentication
-## Overview
-Implement a secure user authentication system...
-
-## Requirements
-- Users should be able to sign up with email
-- Users should be able to log in
-- Sessions should be secure..."
+                placeholder={inputPlaceholder}
                 rows={12}
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-none"
               />
@@ -140,7 +135,7 @@ Implement a secure user authentication system...
                   Submitting...
                 </>
               ) : (
-                'Submit PRD'
+                `Submit ${inputNoun}`
               )}
             </button>
           </div>

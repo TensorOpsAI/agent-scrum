@@ -18,8 +18,8 @@ async def test_list_agents(client: AsyncClient):
     assert response.status_code == 200
 
     data = response.json()
-    # Only 5 active agents by default (scrum_master is inactive)
-    assert len(data) == 5
+    # All 6 agents are active (including scrum_master as manager)
+    assert len(data) == 6
 
     agent_roles = [agent["type"] for agent in data]
     assert "product_owner" in agent_roles
@@ -27,8 +27,7 @@ async def test_list_agents(client: AsyncClient):
     assert "developer" in agent_roles
     assert "code_reviewer" in agent_roles
     assert "qa" in agent_roles
-    # scrum_master is inactive by default
-    assert "scrum_master" not in agent_roles
+    assert "scrum_master" in agent_roles
 
     # IDs should be board-scoped
     agent_ids = [agent["id"] for agent in data]

@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import Optional
 
 from app.db.database import get_db
-from app.db.models import Story, Task, Comment, TaskStatus, PipelineConfig
+from app.db.models import Story, Task, Comment, PipelineConfig
 from app.schemas.story import (
     StoryCreate, StoryUpdate, StoryResponse, StoryStatusTransition, PRDSubmission
 )
@@ -19,6 +19,7 @@ def _story_response(story: Story, task_count: int = 0, completed_count: int = 0)
     return StoryResponse(
         id=story.id,
         board_id=story.board_id,
+        epic_id=story.epic_id,
         title=story.title,
         description=story.description,
         acceptance_criteria=story.acceptance_criteria,
@@ -38,7 +39,7 @@ async def _get_task_counts(db: AsyncSession, story_id: int) -> tuple[int, int]:
     )).scalar() or 0
     completed_count = (await db.execute(
         select(func.count(Task.id)).where(
-            Task.story_id == story_id, Task.status == TaskStatus.DONE
+            Task.story_id == story_id, Task.status == "done"
         )
     )).scalar() or 0
     return task_count, completed_count
@@ -85,6 +86,7 @@ async def create_story(
 
     story = Story(
         board_id=story_data.board_id,
+        epic_id=getattr(story_data, 'epic_id', None),
         title=story_data.title,
         description=story_data.description,
         acceptance_criteria=story_data.acceptance_criteria,

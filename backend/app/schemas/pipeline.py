@@ -17,6 +17,12 @@ class PipelineTemplateResponse(BaseModel):
     agent_automation: bool
     item_noun: str
     has_tasks: bool
+    sub_item_noun: str = "Task"
+    input_noun: str = "PRD"
+    epic_noun: str = "Epic"
+    input_placeholder: Optional[str] = None
+    sub_item_statuses: Optional[list[str]] = None
+    item_source: str = "internal"
 
 
 class BoardCreateRequest(BaseModel):
@@ -32,6 +38,12 @@ class BoardResponse(BaseModel):
     agent_automation: bool
     item_noun: str
     has_tasks: bool
+    sub_item_noun: str = "Task"
+    input_noun: str = "PRD"
+    epic_noun: str = "Epic"
+    input_placeholder: Optional[str] = None
+    sub_item_statuses: Optional[list[str]] = None
+    item_source: str = "internal"
     story_count: int = 0
 
     class Config:

@@ -27,20 +27,14 @@ async def test_create_story(test_session: AsyncSession, test_board: PipelineConf
 
 @pytest.mark.asyncio
 async def test_story_status_values():
-    """Test that all story status values are valid."""
-    statuses = [
-        StoryStatus.BACKLOG,
-        StoryStatus.READY_FOR_BREAKDOWN,
-        StoryStatus.IN_BREAKDOWN,
-        StoryStatus.TASKS_IN_REVIEW,
-        StoryStatus.IN_DEVELOPMENT,
-        StoryStatus.IN_QA,
-        StoryStatus.DONE,
+    """Test that the StoryStatus enum still exists and maps to expected strings."""
+    expected = [
+        "backlog", "ready_for_breakdown", "in_breakdown",
+        "tasks_in_review", "in_development", "in_qa", "done",
     ]
-
-    assert len(statuses) == 7
-    for status in statuses:
-        assert isinstance(status.value, str)
+    enum_values = [s.value for s in StoryStatus]
+    for val in expected:
+        assert val in enum_values, f"Expected status '{val}' not found in StoryStatus enum"
 
 
 @pytest.mark.asyncio
@@ -64,26 +58,20 @@ async def test_create_task(test_session: AsyncSession, test_board: PipelineConfi
 
     assert task.id is not None
     assert task.story_id == story.id
-    assert task.status == TaskStatus.DRAFT
+    assert task.status == "draft"
 
 
 @pytest.mark.asyncio
 async def test_task_status_values():
-    """Test that all task status values are valid."""
-    statuses = [
-        TaskStatus.DRAFT,
-        TaskStatus.PENDING_REVIEW,
-        TaskStatus.READY_FOR_DEVELOPMENT,
-        TaskStatus.IN_PROGRESS,
-        TaskStatus.CODE_REVIEW,
-        TaskStatus.READY_FOR_QA,
-        TaskStatus.QA_IN_PROGRESS,
-        TaskStatus.DONE,
+    """Test that the TaskStatus enum still exists and maps to expected strings."""
+    expected = [
+        "draft", "pending_review", "ready_for_development",
+        "in_progress", "code_review", "ready_for_qa",
+        "qa_in_progress", "done",
     ]
-
-    assert len(statuses) >= 8
-    for status in statuses:
-        assert isinstance(status.value, str)
+    enum_values = [s.value for s in TaskStatus]
+    for val in expected:
+        assert val in enum_values, f"Expected status '{val}' not found in TaskStatus enum"
 
 
 @pytest.mark.asyncio

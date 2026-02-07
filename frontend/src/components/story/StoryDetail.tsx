@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import { storyApi, taskApi } from '../../api/client';
 import { ActivityLog } from './ActivityLog';
 import type { Story, Task, Comment } from '../../types';
-import { TASK_STATUS_LABELS, getAgentLabel, getAgentColor, getStatusLabel } from '../../types';
+import { getSubItemStatusLabel, getAgentLabel, getAgentColor, getStatusLabel } from '../../types';
 import { usePipelineStore } from '../../store/pipelineStore';
 
 interface StoryDetailProps {
@@ -25,6 +25,8 @@ const taskStatusColors: Record<string, string> = {
 
 export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
   const columns = usePipelineStore((s) => s.activeConfig?.columns ?? []);
+  const itemNoun = usePipelineStore((s) => s.activeConfig?.item_noun ?? 'Story');
+  const subItemNoun = usePipelineStore((s) => s.activeConfig?.sub_item_noun ?? 'Task');
   const [story, setStory] = useState<Story | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -77,7 +79,7 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
             <FileText className="w-5 h-5 text-blue-500" />
             <div>
               <h2 className="text-lg font-semibold text-white">
-                Story #{story.id}
+                {itemNoun} #{story.id}
               </h2>
               <span className={clsx(
                 'text-xs px-2 py-0.5 rounded',
@@ -117,15 +119,15 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
 
             <div className="flex items-center gap-4 text-sm text-gray-400">
               <span>Priority: {story.priority}</span>
-              <span>Tasks: {story.completed_task_count}/{story.task_count}</span>
+              <span>{subItemNoun}s: {story.completed_task_count}/{story.task_count}</span>
             </div>
           </div>
 
           {/* Tasks section */}
           <div className="mb-6">
-            <h4 className="text-sm font-medium text-gray-400 mb-3">Tasks</h4>
+            <h4 className="text-sm font-medium text-gray-400 mb-3">{subItemNoun}s</h4>
             {tasks.length === 0 ? (
-              <p className="text-gray-500 text-sm">No tasks yet</p>
+              <p className="text-gray-500 text-sm">No {subItemNoun.toLowerCase()}s yet</p>
             ) : (
               <div className="space-y-2">
                 {tasks.map((task) => (
@@ -153,7 +155,7 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
                           'text-xs px-2 py-0.5 rounded',
                           taskStatusColors[task.status]
                         )}>
-                          {TASK_STATUS_LABELS[task.status]}
+                          {getSubItemStatusLabel(task.status)}
                         </span>
                         <ChevronRight className={clsx(
                           'w-4 h-4 text-gray-400 transition-transform',

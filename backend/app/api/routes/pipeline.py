@@ -38,6 +38,12 @@ async def list_templates():
             agent_automation=t["agent_automation"],
             item_noun=t["item_noun"],
             has_tasks=t["has_tasks"],
+            sub_item_noun=t.get("sub_item_noun", "Task"),
+            input_noun=t.get("input_noun", "PRD"),
+            epic_noun=t.get("epic_noun", "Epic"),
+            input_placeholder=t.get("input_placeholder"),
+            sub_item_statuses=t.get("sub_item_statuses"),
+            item_source=t.get("item_source", "internal"),
         )
         for t in PIPELINE_TEMPLATES
     ]
@@ -56,6 +62,12 @@ def _board_response(board: PipelineConfig, story_count: int = 0) -> BoardRespons
         agent_automation=board.agent_automation,
         item_noun=board.item_noun,
         has_tasks=board.has_tasks,
+        sub_item_noun=board.sub_item_noun or "Task",
+        input_noun=board.input_noun or "PRD",
+        epic_noun=board.epic_noun or "Epic",
+        input_placeholder=board.input_placeholder,
+        sub_item_statuses=board.sub_item_statuses,
+        item_source=board.item_source or "internal",
         story_count=story_count,
     )
 
@@ -98,6 +110,12 @@ async def create_board(
         agent_automation=template["agent_automation"],
         item_noun=template["item_noun"],
         has_tasks=template["has_tasks"],
+        sub_item_noun=template.get("sub_item_noun", "Task"),
+        input_noun=template.get("input_noun", "PRD"),
+        epic_noun=template.get("epic_noun", "Epic"),
+        input_placeholder=template.get("input_placeholder"),
+        sub_item_statuses=template.get("sub_item_statuses"),
+        item_source=template.get("item_source", "internal"),
     )
     db.add(board)
     await db.commit()

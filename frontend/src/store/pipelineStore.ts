@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { PipelineConfig, PipelineTemplate } from '../types';
-import { pipelineApi, boardApi } from '../api/client';
+import type { PipelineConfig, PipelineTemplate, Epic } from '../types';
+import { pipelineApi, boardApi, epicApi } from '../api/client';
 
 const CURRENT_BOARD_KEY = 'board_current_id';
 
@@ -23,6 +23,10 @@ interface BoardState {
   templates: PipelineTemplate[];
   isLoading: boolean;
 
+  // Epics
+  epics: Epic[];
+  selectedEpicId: number | null;
+
   // Derived
   currentBoard: PipelineConfig | null;
 
@@ -36,6 +40,8 @@ interface BoardState {
   setCurrentBoard: (id: number) => void;
   addBoard: (board: PipelineConfig) => void;
   removeBoard: (id: number) => void;
+  fetchEpics: (boardId?: number) => Promise<void>;
+  setSelectedEpic: (id: number | null) => void;
 }
 
 function deriveCurrentBoard(boards: PipelineConfig[], currentBoardId: number | null): PipelineConfig | null {
@@ -48,6 +54,8 @@ export const usePipelineStore = create<BoardState>((set, get) => ({
   currentBoardId: getSavedBoardId(),
   templates: [],
   isLoading: false,
+  epics: [],
+  selectedEpicId: null,
   currentBoard: null,
   activeConfig: null,
 
@@ -156,5 +164,18 @@ export const usePipelineStore = create<BoardState>((set, get) => ({
       currentBoard: current,
       activeConfig: current,
     });
+  },
+
+  fetchEpics: async (boardId?: number) => {
+    try {
+      const epics = await epicApi.list(boardId);
+      set({ epics });
+    } catch (error) {
+      console.error('Error fetching epics:', error);
+    }
+  },
+
+  setSelectedEpic: (id: number | null) => {
+    set({ selectedEpicId: id });
   },
 }));

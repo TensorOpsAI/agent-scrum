@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Story, Task, Comment, StoryStatus, TaskStatus, PipelineTemplate, PipelineConfig } from '../types';
+import type { Story, Task, Comment, Epic, StoryStatus, TaskStatus, PipelineTemplate, PipelineConfig } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -119,7 +119,15 @@ export const taskApi = {
   },
 };
 
-// PRD API
+// Input API (generic input submission)
+export const inputApi = {
+  submit: async (content: string, boardId: number, title?: string): Promise<Story> => {
+    const response = await api.post<Story>('/input', { content, title, board_id: boardId });
+    return response.data;
+  },
+};
+
+// PRD API (backward-compatible alias)
 export const prdApi = {
   submit: async (content: string, boardId: number, title?: string): Promise<Story> => {
     const response = await api.post<Story>('/prd', { content, title, board_id: boardId });
@@ -127,9 +135,54 @@ export const prdApi = {
   },
 };
 
+// Epic API
+export const epicApi = {
+  list: async (boardId?: number): Promise<Epic[]> => {
+    const params: Record<string, unknown> = {};
+    if (boardId != null) params.board_id = boardId;
+    const response = await api.get<Epic[]>('/epics', { params });
+    return response.data;
+  },
+
+  get: async (id: number): Promise<Epic> => {
+    const response = await api.get<Epic>(`/epics/${id}`);
+    return response.data;
+  },
+
+  create: async (data: {
+    board_id: number;
+    title: string;
+    description?: string;
+  }): Promise<Epic> => {
+    const response = await api.post<Epic>('/epics', data);
+    return response.data;
+  },
+
+  update: async (
+    id: number,
+    data: Partial<{
+      title: string;
+      description: string;
+      status: string;
+    }>
+  ): Promise<Epic> => {
+    const response = await api.put<Epic>(`/epics/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/epics/${id}`);
+  },
+
+  getStories: async (id: number): Promise<Story[]> => {
+    const response = await api.get<Story[]>(`/epics/${id}/stories`);
+    return response.data;
+  },
+};
+
 // Agent API
 export const agentApi = {
-  list: async (): Promise<
+  list: async (boardId?: number): Promise<
     Array<{
       id: string;
       type: string;
@@ -140,7 +193,9 @@ export const agentApi = {
       is_builtin?: boolean;
     }>
   > => {
-    const response = await api.get('/agents');
+    const params: Record<string, unknown> = {};
+    if (boardId != null) params.board_id = boardId;
+    const response = await api.get('/agents', { params });
     return response.data;
   },
 };
@@ -405,6 +460,17 @@ export const agentManagementApi = {
 
   getAgentCard: async (agentId: string): Promise<Record<string, unknown>> => {
     const response = await api.get(`/agent-management/agents/${agentId}/.well-known/agent.json`);
+    return response.data;
+  },
+};
+
+// Simulate API
+export const simulateApi = {
+  generate: async (boardId: number, epicId?: number, count?: number): Promise<{ success: boolean; count: number; items: unknown[] }> => {
+    const response = await api.post(`/boards/${boardId}/simulate`, {
+      epic_id: epicId,
+      count: count ?? 5,
+    });
     return response.data;
   },
 };

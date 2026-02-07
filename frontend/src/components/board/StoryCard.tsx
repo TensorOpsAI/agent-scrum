@@ -74,7 +74,7 @@ export function StoryCard({ story, isSelected, onClick }: StoryCardProps) {
         {story.task_count === 0 && (
           <div className="flex items-center gap-1 text-gray-500">
             <FileText className="w-4 h-4" />
-            <span>No tasks</span>
+            <span>No sub-items</span>
           </div>
         )}
       </div>

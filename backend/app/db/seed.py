@@ -98,6 +98,12 @@ async def seed_default_agents(db: AsyncSession) -> int:
             agent_automation=template["agent_automation"],
             item_noun=template["item_noun"],
             has_tasks=template["has_tasks"],
+            sub_item_noun=template.get("sub_item_noun", "Task"),
+            input_noun=template.get("input_noun", "PRD"),
+            epic_noun=template.get("epic_noun", "Epic"),
+            input_placeholder=template.get("input_placeholder"),
+            sub_item_statuses=template.get("sub_item_statuses"),
+            item_source=template.get("item_source", "internal"),
         )
         db.add(board)
         await db.commit()

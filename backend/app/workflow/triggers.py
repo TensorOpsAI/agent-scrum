@@ -8,52 +8,82 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import Story, Task, SoftwareDevStatus, TaskStatus
+from app.db.models import Story, Task
 from app.agents.executor import executor
 from app.api.websocket.manager import broadcast_agent_activity
-from app.pipeline.templates import get_board
+from app.pipeline.templates import get_board, get_template_by_id
 
 logger = logging.getLogger(__name__)
 
 
-async def on_prd_submitted(
-    prd_content: str,
+async def on_input_submitted(
+    content: str,
     title: str | None,
     board_id: int,
     db: AsyncSession,
 ) -> dict:
-    """Trigger when a new PRD is submitted.
+    """Trigger when new input is submitted (PRD, Job Req, Lead List, Incident Report, etc.).
 
-    Executes Product Owner synchronously to parse PRD and create stories.
-    Stories are created in READY_FOR_BREAKDOWN status - monitor will pick them up.
+    For internal-source boards (software_dev): dispatches to intake agent to parse input.
+    For external-source boards (TA, sales, CISO): creates an Epic from the input.
     """
-    logger.info(f"[TRIGGER] on_prd_submitted called. Title: {title}, Board: {board_id}, Content length: {len(prd_content)}")
+    logger.info(f"[TRIGGER] on_input_submitted called. Title: {title}, Board: {board_id}, Content length: {len(content)}")
 
     # Guard: only run if automation is enabled for this board
     board = await get_board(board_id, db)
     if not board or not board.get("agent_automation"):
-        logger.info("[TRIGGER] Agent automation disabled, skipping PRD processing")
+        logger.info("[TRIGGER] Agent automation disabled, skipping input processing")
         return {"skipped": True, "reason": "Agent automation disabled for this board"}
 
     await broadcast_agent_activity(
         "trigger",
-        "prd_submitted",
-        {"title": title, "content_length": len(prd_content)}
+        "input_submitted",
+        {"title": title, "content_length": len(content)}
     )
 
-    # Execute Product Owner agent to parse the PRD
-    # This is the ONLY direct agent execution - because PRD submission is user-initiated
+    # Check if this is an external-source board
+    item_source = board.get("item_source", "internal")
+    if item_source == "external":
+        # For external boards: create an Epic (Position/Account/Threat Category)
+        epic_noun = board.get("epic_noun", "Epic")
+        epic_title = title or content[:80]
+        logger.info(f"[TRIGGER] External board — creating {epic_noun}: {epic_title}")
+
+        from app.db.models import Epic
+        epic = Epic(
+            board_id=board_id,
+            title=epic_title,
+            description=content,
+        )
+        db.add(epic)
+        await db.commit()
+        await db.refresh(epic)
+
+        logger.info(f"[TRIGGER] Created {epic_noun} #{epic.id}: {epic_title}")
+        return {
+            "epic_created": True,
+            "epic_id": epic.id,
+            "epic_title": epic_title,
+            "message": f"{epic_noun} created. Use 'Simulate' to generate items.",
+        }
+
+    # Internal-source board: dispatch to intake agent
+    template_id = board.get("template_id", "software_dev")
+    template = get_template_by_id(template_id)
+    intake_agent = template.get("intake_agent", "product_owner") if template else "product_owner"
+
+    # Execute the intake agent to parse the input
     context = {
         "skill": "parse_prd",
-        "triggered_by": "prd_submission",
+        "triggered_by": "input_submission",
         "board_id": board_id,
     }
 
-    logger.info("[TRIGGER] Calling executor.execute_agent for product_owner...")
+    logger.info(f"[TRIGGER] Calling executor.execute_agent for {intake_agent}...")
     try:
         result = await executor.execute_agent(
-            agent_id="product_owner",
-            message=prd_content,
+            agent_id=intake_agent,
+            message=content,
             context=context,
         )
         logger.info(f"[TRIGGER] executor.execute_agent returned: {result}")
@@ -61,11 +91,23 @@ async def on_prd_submitted(
         logger.error(f"[TRIGGER] executor.execute_agent failed: {e}", exc_info=True)
         raise
 
-    # Stories are created with READY_FOR_BREAKDOWN status
-    # The monitor will pick them up and trigger developer breakdown
-    # We do NOT trigger anything else here to avoid dual-triggering
-
     return result
+
+
+# Backward-compatible alias
+async def on_prd_submitted(
+    prd_content: str,
+    title: str | None,
+    board_id: int,
+    db: AsyncSession,
+) -> dict:
+    """Backward-compatible alias for on_input_submitted."""
+    return await on_input_submitted(
+        content=prd_content,
+        title=title,
+        board_id=board_id,
+        db=db,
+    )
 
 
 async def on_story_status_changed(
@@ -93,8 +135,8 @@ async def on_story_status_changed(
 
 async def on_task_status_changed(
     task: Task,
-    old_status: TaskStatus,
-    new_status: TaskStatus,
+    old_status: str,
+    new_status: str,
     db: AsyncSession,
 ) -> dict:
     """Called when a task's status changes.
@@ -106,12 +148,12 @@ async def on_task_status_changed(
         "task_transition",
         {
             "task_id": task.id,
-            "from": old_status.value,
-            "to": new_status.value,
+            "from": old_status,
+            "to": new_status,
         }
     )
 
-    return {"status_changed": True, "new_status": new_status.value}
+    return {"status_changed": True, "new_status": new_status}
 
 
 async def on_tasks_created(

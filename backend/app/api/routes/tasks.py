@@ -4,7 +4,7 @@ from sqlalchemy import select
 from typing import Optional
 
 from app.db.database import get_db
-from app.db.models import Task, Story, Comment, TaskStatus
+from app.db.models import Task, Story, Comment
 from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskStatusTransition
 from app.schemas.comment import CommentResponse
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 @router.get("", response_model=list[TaskResponse])
 async def list_tasks(
     story_id: Optional[int] = None,
-    status: Optional[TaskStatus] = None,
+    status: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     query = select(Task)

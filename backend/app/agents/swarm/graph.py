@@ -1,38 +1,75 @@
 """
-LangGraph Swarm - Multi-agent workflow using StateGraph.
+Manager-Worker Swarm - Agent coordination via A2A communication.
 
-This creates a workflow graph where:
-1. Router checks board state and determines which agent should work
-2. Agent nodes invoke LangGraph ReAct agents to do their work
-3. Control returns to router for next assignment
+Replaces the LangGraph StateGraph with a Manager-Worker topology where:
+1. Each board has a Manager agent (e.g., Scrum Master for software_dev)
+2. Manager scans for pending work and dispatches to Worker agents via A2A
+3. All communication is visible in chat as A2A messages
 """
 import asyncio
+import logging
 import random
 from datetime import datetime, timedelta
-from typing import Literal, Optional
+from typing import Optional
 from sqlalchemy import select
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import HumanMessage
 
 from app.db.database import async_session_maker
-from app.db.models import Story, Task, PipelineConfig, TaskStatus, DynamicAgent
-from app.agents.langgraph_agents import get_agent
+from app.db.models import Story, Task, PipelineConfig, DynamicAgent
 from app.agents.executor import set_swarm_active
-from app.api.websocket.manager import broadcast_agent_status, broadcast_swarm_status
-from app.a2a.router import a2a_router
+from app.api.websocket.manager import broadcast_swarm_status
 from app.pipeline.templates import TEMPLATE_WORKFLOWS
-from .state import SwarmState
 
+logger = logging.getLogger(__name__)
 
 # How long before an item is considered "stuck" (in seconds)
 STUCK_THRESHOLD = 5
 
-# Maximum iterations per cycle
-MAX_ITERATIONS = 20
-
 # Minimum working time for visual feedback (seconds)
 MIN_WORKING_TIME = 3.0
 
+
+# ============================================================================
+# Action labels for natural Manager→Worker messages
+# ============================================================================
+
+ACTION_LABELS = {
+    # Software Dev
+    "breakdown": "break down",
+    "review_tasks": "review the tasks for",
+    "implementation": "write the implementation for",
+    "code_review": "review the code for",
+    "qa_scenarios": "create test scenarios for",
+    "qa_run": "run QA tests on",
+    # Talent Acquisition
+    "screen_resume": "screen the resume for",
+    "phone_screen": "conduct a phone screen for",
+    "schedule_interview": "schedule an interview for",
+    "prepare_offer": "prepare an offer for",
+    "evaluate": "evaluate",
+    "conduct": "conduct the interview for",
+    "review_feedback": "review feedback for",
+    "verify": "verify",
+    # Sales
+    "qualify_lead": "qualify the lead for",
+    "create_proposal": "create a proposal for",
+    "negotiate": "negotiate the contract for",
+    "build_poc": "build a POC for",
+    "demo": "run a demo for",
+    "review_deal": "review the deal for",
+    # CISO
+    "assess_threat": "assess the threat for",
+    "mitigate": "implement mitigation for",
+    "audit": "audit compliance for",
+    "implement_control": "implement security controls for",
+    "deploy_fix": "deploy the fix for",
+    "compliance_review": "review compliance for",
+    "verify_mitigation": "verify mitigation for",
+}
+
+
+# ============================================================================
+# Core helpers (kept from previous implementation)
+# ============================================================================
 
 async def get_active_agent_ids() -> set[str]:
     """Get the set of currently active agent IDs from the database."""
@@ -76,7 +113,8 @@ async def scan_board() -> dict:
             workflow = TEMPLATE_WORKFLOWS.get(board.template_id, {})
 
             # Scan stories for statuses that have handlers
-            for status_key, (agent_role, action) in workflow.get("story_handlers", {}).items():
+            for status_key, handler in workflow.get("story_handlers", {}).items():
+                agent_role, action = handler[0], handler[1]
                 result = await db.execute(
                     select(Story).where(
                         Story.board_id == board.id,
@@ -97,15 +135,11 @@ async def scan_board() -> dict:
                         })
 
             # Scan tasks for statuses that have handlers
-            for status_key, (agent_role, action) in workflow.get("task_handlers", {}).items():
-                try:
-                    task_status = TaskStatus(status_key)
-                except ValueError:
-                    continue
-
+            for status_key, handler in workflow.get("task_handlers", {}).items():
+                agent_role, action = handler[0], handler[1]
                 result = await db.execute(
                     select(Task).join(Story, Task.story_id == Story.id).where(
-                        Task.status == task_status,
+                        Task.status == status_key,
                         Story.board_id == board.id,
                     )
                 )
@@ -117,7 +151,7 @@ async def scan_board() -> dict:
                             "story_id": task.story_id,
                             "board_id": board.id,
                             "title": task.title,
-                            "status": task.status.value,
+                            "status": task.status,
                             "action": action,
                             "agent": agent_id,
                             "message": f"Process task #{task.id}: {task.title}",
@@ -140,7 +174,7 @@ async def claim_item(item_type: str, item_id: int, expected_status: str) -> bool
         else:
             result = await db.execute(select(Task).where(Task.id == item_id))
             item = result.scalar_one_or_none()
-            if not item or item.status.value != expected_status:
+            if not item or item.status != expected_status:
                 return False
 
         if not is_stuck(item.updated_at):
@@ -155,123 +189,69 @@ async def claim_item(item_type: str, item_id: int, expected_status: str) -> bool
 _working_agents: dict[str, str] = {}  # agent_id -> work_key
 
 
-async def router_node(state: SwarmState) -> SwarmState:
-    """Router node - scans board and determines which agent should work next."""
-    # Scan the board
-    board = await scan_board()
+# ============================================================================
+# Manager-Worker dispatch
+# ============================================================================
 
-    # Get currently active agents from database
-    active_agents = await get_active_agent_ids()
+async def get_manager_for_board(board_id: int) -> Optional[str]:
+    """Get the manager agent ID for a board (e.g., 'scrum_master_1')."""
+    async with async_session_maker() as db:
+        result = await db.execute(
+            select(PipelineConfig.template_id).where(PipelineConfig.id == board_id)
+        )
+        template_id = result.scalar_one_or_none()
+        if not template_id:
+            return None
 
-    # Combine all pending work
-    all_work = []
-    for story in board["pending_stories"]:
-        all_work.append(("story", story))
-    for task in board["pending_tasks"]:
-        all_work.append(("task", task))
+    from app.pipeline.templates import get_template_manager_role
+    manager_role = get_template_manager_role(template_id)
+    return f"{manager_role}_{board_id}" if manager_role else None
 
-    # Find available work
-    next_agent = None
-    next_work = None
 
-    for work_type, work_item in all_work:
-        agent_id = work_item["agent"]
+def group_by_board(board_data: dict) -> dict[int, list[dict]]:
+    """Group pending stories and tasks by board_id."""
+    by_board: dict[int, list[dict]] = {}
 
-        # Build work key
-        work_key = f"{work_item['action']}:{work_item['id']}"
-
-        # Check if agent is active in database
-        if agent_id not in active_agents:
-            continue
-
-        # Check if agent is already working
-        if agent_id in _working_agents:
-            continue
-
-        next_agent = agent_id
-        next_work = {
-            "type": work_type,
-            "item": work_item,
+    for story in board_data["pending_stories"]:
+        bid = story["board_id"]
+        work_key = f"{story['action']}:{story['id']}"
+        by_board.setdefault(bid, []).append({
+            "type": "story",
+            "item": story,
             "work_key": work_key,
-        }
-        break
+            "agent": story["agent"],
+            "message": story["message"],
+        })
 
-    return {
-        **state,
-        "pending_stories": board["pending_stories"],
-        "pending_tasks": board["pending_tasks"],
-        "active_agent": next_agent,
-        "last_action": next_work,
-        "iteration": state.get("iteration", 0) + 1,
-    }
+    for task in board_data["pending_tasks"]:
+        bid = task["board_id"]
+        work_key = f"{task['action']}:{task['id']}"
+        by_board.setdefault(bid, []).append({
+            "type": "task",
+            "item": task,
+            "work_key": work_key,
+            "agent": task["agent"],
+            "message": task["message"],
+        })
 
-
-async def invoke_agent(agent_id: str, message: str, work_key: str, context: dict = None) -> dict:
-    """Invoke a LangGraph agent via A2A router to record messages in chat.
-
-    Args:
-        agent_id: The agent to invoke
-        message: The message/task for the agent
-        work_key: Unique key for this work item
-        context: Optional context (story_id, task_id, etc.)
-    """
-    global _working_agents
-
-    # Mark agent as working
-    _working_agents[agent_id] = work_key
-    await broadcast_agent_status(agent_id, "working", message[:50])
-
-    start_time = datetime.utcnow()
-
-    try:
-        # Use A2A router to send message - this records in chat
-        async with async_session_maker() as db:
-            result_task = await a2a_router.send_to_agent(
-                from_agent="scrum_master",  # Swarm acts as scrum master
-                to_agent=agent_id,
-                message=message,
-                context=context or {},
-                db=db,
-            )
-
-        # Ensure minimum working time for visual feedback
-        elapsed = (datetime.utcnow() - start_time).total_seconds()
-        if elapsed < MIN_WORKING_TIME:
-            await asyncio.sleep(MIN_WORKING_TIME - elapsed)
-
-        return {"success": True, "result": result_task}
-
-    except Exception as e:
-        print(f"[Swarm] Agent {agent_id} error: {e}")
-        import traceback
-        traceback.print_exc()
-        return {"error": str(e)}
-
-    finally:
-        # Mark agent as idle
-        _working_agents.pop(agent_id, None)
-        await broadcast_agent_status(agent_id, "idle", None)
+    return by_board
 
 
-async def dynamic_agent_node(state: SwarmState) -> SwarmState:
-    """Universal agent node - handles all agents (both built-in and domain-specific)."""
-    work = state.get("last_action")
-    if not work:
-        return {**state, "active_agent": None}
-
-    agent_id = state.get("active_agent")
+def build_assignment_message(work: dict) -> str:
+    """Generate a natural Manager→Worker assignment message."""
     item = work["item"]
-    work_key = work["work_key"]
+    action = item.get("action", "process")
+    action_label = ACTION_LABELS.get(action, action.replace("_", " "))
+    item_type = "story" if work["type"] == "story" else "task"
+    return f"Please {action_label} {item_type} #{item['id']}: {item['title']}"
 
-    # Claim the item
-    item_type = work["type"]
-    claimed = await claim_item(item_type, item["id"], item["status"])
-    if not claimed:
-        return {**state, "active_agent": None}
 
-    # Build context for chat
+def build_work_context(work: dict) -> dict:
+    """Build context dict for A2A message from a work item."""
+    item = work["item"]
     context = {"action": item.get("action", "work")}
-    if item_type == "story":
+
+    if work["type"] == "story":
         context["story_id"] = item["id"]
         context["board_id"] = item.get("board_id")
     else:
@@ -279,83 +259,85 @@ async def dynamic_agent_node(state: SwarmState) -> SwarmState:
         context["story_id"] = item.get("story_id")
         context["board_id"] = item.get("board_id")
 
-    # Invoke the agent via A2A
-    result = await invoke_agent(agent_id, item["message"], work_key, context)
-
-    if result.get("success"):
-        print(f"[Swarm] {agent_id} completed: {work_key}")
-    else:
-        print(f"[Swarm] {agent_id} failed: {result.get('error')}")
-
-    return {**state, "active_agent": None}
+    return context
 
 
-def should_continue(state: SwarmState) -> Literal["router", "end"]:
-    """Determine if the swarm should continue processing."""
-    # Stop if max iterations reached
-    if state.get("iteration", 0) >= MAX_ITERATIONS:
-        return "end"
+async def dispatch_one(manager_id: str, worker_id: str, work: dict):
+    """Manager assigns one work item to a worker via A2A.
 
-    # Stop if no more work
-    if not state.get("pending_stories") and not state.get("pending_tasks"):
-        return "end"
-
-    return "router"
-
-
-def route_to_agent(state: SwarmState) -> str:
-    """Route to the agent node or end."""
-    active = state.get("active_agent")
-    if not active:
-        return "end"
-    return "agent"
-
-
-def create_agent_swarm() -> StateGraph:
-    """Create the multi-agent swarm graph.
-
-    Returns a compiled StateGraph that orchestrates all agents.
-    All agents (built-in and domain-specific) route through the
-    single dynamic_agent_node.
+    The A2A router records the Manager→Worker message in chat,
+    executes the worker agent, and records the Worker→Manager response.
+    The executor handles working/idle status broadcasts.
     """
-    workflow = StateGraph(SwarmState)
+    _working_agents[worker_id] = work["work_key"]
 
-    # Add nodes
-    workflow.add_node("router", router_node)
-    workflow.add_node("agent", dynamic_agent_node)
+    try:
+        from app.a2a.router import a2a_router
 
-    # Set entry point
-    workflow.set_entry_point("router")
+        message = build_assignment_message(work)
+        context = build_work_context(work)
 
-    # Add conditional routing from router to agent
-    workflow.add_conditional_edges(
-        "router",
-        route_to_agent,
-        {
-            "agent": "agent",
-            "end": END,
-        }
-    )
+        async with async_session_maker() as db:
+            await a2a_router.send_to_agent(
+                from_agent=manager_id,
+                to_agent=worker_id,
+                message=message,
+                context=context,
+                db=db,
+            )
 
-    # After agent, check if we should continue
-    workflow.add_conditional_edges(
-        "agent",
-        should_continue,
-        {
-            "router": "router",
-            "end": END,
-        }
-    )
+    except Exception as e:
+        logger.error(f"[Swarm] {manager_id} → {worker_id} failed: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        _working_agents.pop(worker_id, None)
 
-    return workflow
 
+async def dispatch_pending_work():
+    """Manager scans boards and dispatches work to workers via A2A.
+
+    For each board with pending work:
+    1. Find the board's manager agent
+    2. For each pending item, send an A2A message from manager to worker
+    3. The A2A router records visible chat messages and executes the worker
+
+    Dispatches one item at a time so chat messages appear naturally staggered.
+    """
+    board_data = await scan_board()
+    active_agents = await get_active_agent_ids()
+
+    # Group work by board_id
+    work_by_board = group_by_board(board_data)
+
+    # For each board, dispatch through its manager — one at a time
+    for board_id, items in work_by_board.items():
+        manager_id = await get_manager_for_board(board_id)
+        if not manager_id or manager_id not in active_agents:
+            continue
+
+        for work in items:
+            worker_id = work["agent"]
+            if worker_id not in active_agents or worker_id in _working_agents:
+                continue
+
+            # Claim the item (prevents double-processing)
+            claimed = await claim_item(work["type"], work["item"]["id"], work["item"]["status"])
+            if not claimed:
+                continue
+
+            # Dispatch: Manager → Worker via A2A (creates chat trail)
+            await dispatch_one(manager_id, worker_id, work)
+
+
+# ============================================================================
+# ScrumSwarm - High-level interface
+# ============================================================================
 
 class ScrumSwarm:
-    """High-level interface for the Scrum agent swarm."""
+    """High-level interface for the Manager-Worker agent swarm."""
 
     def __init__(self):
-        self._graph = None
-        self._compiled = None
         self._running = False
         self._paused = False
         self._task: Optional[asyncio.Task] = None
@@ -374,28 +356,10 @@ class ScrumSwarm:
             return "paused"
         return "running"
 
-    def _ensure_compiled(self):
-        """Ensure the graph is compiled."""
-        if self._compiled is None:
-            self._graph = create_agent_swarm()
-            self._compiled = self._graph.compile()
-
     async def run_once(self) -> dict:
-        """Run one iteration of the swarm."""
-        self._ensure_compiled()
-
-        initial_state: SwarmState = {
-            "messages": [],
-            "active_agent": None,
-            "pending_stories": [],
-            "pending_tasks": [],
-            "current_work": {},
-            "last_action": None,
-            "iteration": 0,
-        }
-
-        result = await self._compiled.ainvoke(initial_state)
-        return result
+        """Run one iteration of the swarm — dispatch all pending work."""
+        await dispatch_pending_work()
+        return {}
 
     async def start(self):
         """Start the background monitoring loop."""
@@ -405,14 +369,14 @@ class ScrumSwarm:
                 self._paused = False
                 set_swarm_active(True)
                 await broadcast_swarm_status("running")
-                print("[Swarm] Agent swarm resumed")
+                logger.info("[Swarm] Agent swarm resumed")
             return
         self._running = True
         self._paused = False
         set_swarm_active(True)
         self._task = asyncio.create_task(self._monitor_loop())
         await broadcast_swarm_status("running")
-        print("[Swarm] Agent swarm started")
+        logger.info("[Swarm] Agent swarm started")
 
     async def stop(self):
         """Stop the background monitoring loop completely."""
@@ -428,7 +392,7 @@ class ScrumSwarm:
         # Clear working agents
         _working_agents.clear()
         await broadcast_swarm_status("stopped")
-        print("[Swarm] Agent swarm stopped")
+        logger.info("[Swarm] Agent swarm stopped")
 
     async def pause(self):
         """Pause the swarm (agents stop taking new work)."""
@@ -436,7 +400,7 @@ class ScrumSwarm:
             self._paused = True
             set_swarm_active(False)
             await broadcast_swarm_status("paused")
-            print("[Swarm] Agent swarm paused")
+            logger.info("[Swarm] Agent swarm paused")
 
     async def resume(self):
         """Resume the swarm after pausing."""
@@ -444,7 +408,7 @@ class ScrumSwarm:
             self._paused = False
             set_swarm_active(True)
             await broadcast_swarm_status("running")
-            print("[Swarm] Agent swarm resumed")
+            logger.info("[Swarm] Agent swarm resumed")
 
     async def _monitor_loop(self):
         """Main monitoring loop."""
@@ -457,7 +421,7 @@ class ScrumSwarm:
                 if not self._paused:
                     await self.run_once()
             except Exception as e:
-                print(f"[Swarm] Error: {e}")
+                logger.error(f"[Swarm] Error: {e}")
                 import traceback
                 traceback.print_exc()
 

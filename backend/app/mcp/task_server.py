@@ -25,7 +25,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.db.database import async_session_maker, init_db
-from app.db.models import Story, Task, Comment, TaskStatus, PipelineConfig
+from app.db.models import Story, Task, Comment, PipelineConfig
 from app.pipeline.templates import get_valid_statuses
 from sqlalchemy.orm import selectinload
 
@@ -417,7 +417,7 @@ async def get_task(task_id: int) -> dict:
             "description": task.description,
             "implementation_notes": task.implementation_notes,
             "test_scenarios": task.test_scenarios,
-            "status": task.status.value,
+            "status": task.status,
             "assigned_agent": task.assigned_agent,
         }
 
@@ -433,7 +433,7 @@ async def get_tasks_for_story(story_id: int) -> list[dict]:
                 "id": t.id,
                 "title": t.title,
                 "description": t.description,
-                "status": t.status.value,
+                "status": t.status,
                 "implementation_notes": t.implementation_notes,
                 "test_scenarios": t.test_scenarios,
             }
@@ -448,7 +448,7 @@ async def create_task(story_id: int, title: str, description: str) -> dict:
             story_id=story_id,
             title=title,
             description=description,
-            status=TaskStatus.DRAFT,
+            status="draft",
         )
         db.add(task)
         await db.commit()
@@ -459,7 +459,7 @@ async def create_task(story_id: int, title: str, description: str) -> dict:
             "story_id": task.story_id,
             "title": task.title,
             "description": task.description,
-            "status": task.status.value,
+            "status": task.status,
         }
 
 
@@ -472,12 +472,9 @@ async def update_task_status(task_id: int, new_status: str) -> dict:
         if not task:
             return {"error": f"Task {task_id} not found"}
 
-        try:
-            task.status = TaskStatus(new_status)
-            await db.commit()
-            return {"success": True, "message": f"Task {task_id} status updated to {new_status}"}
-        except ValueError:
-            return {"error": f"Invalid status: {new_status}"}
+        task.status = new_status
+        await db.commit()
+        return {"success": True, "message": f"Task {task_id} status updated to {new_status}"}
 
 
 async def update_task_implementation(task_id: int, implementation_notes: str) -> dict:
@@ -511,12 +508,7 @@ async def update_task_test_scenarios(task_id: int, test_scenarios: str) -> dict:
 async def list_tasks_by_status(status: str) -> list[dict]:
     """List tasks by status."""
     async with async_session_maker() as db:
-        try:
-            status_enum = TaskStatus(status)
-        except ValueError:
-            return [{"error": f"Invalid status: {status}"}]
-
-        result = await db.execute(select(Task).where(Task.status == status_enum))
+        result = await db.execute(select(Task).where(Task.status == status))
         tasks = result.scalars().all()
 
         return [
@@ -524,7 +516,7 @@ async def list_tasks_by_status(status: str) -> list[dict]:
                 "id": t.id,
                 "story_id": t.story_id,
                 "title": t.title,
-                "status": t.status.value,
+                "status": t.status,
             }
             for t in tasks
         ]
@@ -599,12 +591,15 @@ async def get_board_summary() -> dict:
             })
 
         # Count tasks by status (across all boards)
+        _all_statuses = ["draft", "pending_review", "ready_for_development", "in_progress", "code_review", "ready_for_qa", "qa_in_progress", "done", "pending", "scheduled", "review", "identified", "verified"]
         task_counts = {}
-        for status in TaskStatus:
+        for status in _all_statuses:
             result = await db.execute(
                 select(func.count(Task.id)).where(Task.status == status)
             )
-            task_counts[status.value] = result.scalar() or 0
+            count = result.scalar() or 0
+            if count > 0:
+                task_counts[status] = count
 
         return {
             "boards": board_summaries,

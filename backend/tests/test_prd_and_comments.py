@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Story, Task, Comment, StoryStatus, TaskStatus, PipelineConfig
+from app.db.models import Story, Task, Comment, StoryStatus, PipelineConfig
 
 
 async def _get_default_board_id(client: AsyncClient) -> int:
@@ -114,7 +114,7 @@ async def test_get_task_comments(client: AsyncClient, test_session: AsyncSession
     task = Task(
         story_id=story.id,
         title="Test Task",
-        status=TaskStatus.IN_PROGRESS,
+        status="in_progress",
     )
     test_session.add(task)
     await test_session.flush()

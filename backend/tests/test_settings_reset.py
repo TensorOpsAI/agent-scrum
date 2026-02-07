@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import Story, Task, Comment, AgentMessage, StoryStatus, TaskStatus, PipelineConfig
+from app.db.models import Story, Task, Comment, AgentMessage, StoryStatus, PipelineConfig
 
 
 @pytest.mark.asyncio
@@ -14,7 +14,7 @@ async def test_reset_clears_all_data(client: AsyncClient, test_session: AsyncSes
     test_session.add(story)
     await test_session.flush()
 
-    task = Task(story_id=story.id, title="Test Task", status=TaskStatus.DRAFT)
+    task = Task(story_id=story.id, title="Test Task", status="draft")
     test_session.add(task)
     await test_session.flush()
 

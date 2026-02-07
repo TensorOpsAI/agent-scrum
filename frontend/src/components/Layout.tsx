@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { Bot, Plus, Settings, Users, AlertCircle, X } from 'lucide-react';
+import { Bot, Plus, Settings, Users, AlertCircle, X, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { PRDInputModal } from './modals/PRDInputModal';
@@ -11,7 +11,7 @@ import { ChatPanel } from './chat/ChatPanel';
 import { StoryDetail } from './story/StoryDetail';
 import { useStoryStore } from '../store/storyStore';
 import { usePipelineStore } from '../store/pipelineStore';
-import { storyApi } from '../api/client';
+import { storyApi, simulateApi } from '../api/client';
 
 export function Layout() {
   const [isPRDModalOpen, setIsPRDModalOpen] = useState(false);
@@ -20,6 +20,7 @@ export function Layout() {
   const [isAgentManagerOpen, setIsAgentManagerOpen] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
   const { selectedStoryId, setSelectedStory, fetchStories } = useStoryStore();
   const {
     boards,
@@ -51,6 +52,8 @@ export function Layout() {
 
   const automationEnabled = currentBoard?.agent_automation === true;
   const itemNoun = currentBoard?.item_noun ?? 'Story';
+  const inputNoun = currentBoard?.input_noun ?? 'PRD';
+  const isExternalSource = currentBoard?.item_source === 'external';
 
   const handleAddItem = async () => {
     if (!currentBoardId) return;
@@ -81,6 +84,21 @@ export function Layout() {
     // Fetch stories for the new current board
     const newCurrentId = usePipelineStore.getState().currentBoardId;
     if (newCurrentId) fetchStories(newCurrentId);
+  };
+
+  const handleSimulate = async () => {
+    if (!currentBoardId) return;
+    setIsSimulating(true);
+    setAddError(null);
+    try {
+      await simulateApi.generate(currentBoardId);
+      fetchStories(currentBoardId);
+    } catch (error) {
+      console.error('Error simulating items:', error);
+      setAddError('Failed to simulate items.');
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
   return (
@@ -149,13 +167,29 @@ export function Layout() {
               <Settings className="w-5 h-5" />
             </button>
 
+            {automationEnabled && isExternalSource && (
+              <button
+                onClick={handleSimulate}
+                disabled={isSimulating}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              >
+                <Sparkles className="w-5 h-5" />
+                {isSimulating ? 'Simulating...' : `Simulate ${itemNoun}s`}
+              </button>
+            )}
+
             {automationEnabled ? (
               <button
                 onClick={() => setIsPRDModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                className={clsx(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
+                  isExternalSource
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                )}
               >
                 <Plus className="w-5 h-5" />
-                Submit PRD
+                Submit {inputNoun}
               </button>
             ) : (
               <button

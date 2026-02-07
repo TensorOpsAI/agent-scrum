@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -55,11 +55,34 @@ class PipelineConfig(Base):
     agent_automation = Column(Boolean, default=True)
     item_noun = Column(String(50), default="Story")
     has_tasks = Column(Boolean, default=True)
+    sub_item_noun = Column(String(50), default="Task")
+    input_noun = Column(String(50), default="PRD")
+    epic_noun = Column(String(50), default="Epic")
+    input_placeholder = Column(Text, nullable=True)
+    sub_item_statuses = Column(JSON, nullable=True)
+    item_source = Column(String(20), default="internal")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     stories = relationship("Story", back_populates="board", cascade="all, delete-orphan")
     agents = relationship("DynamicAgent", back_populates="board", cascade="all, delete-orphan")
+    epics = relationship("Epic", back_populates="board", cascade="all, delete-orphan")
+
+
+class Epic(Base):
+    """Grouping entity above stories (Epic/Position/Account/Threat Category)."""
+    __tablename__ = "epics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    board_id = Column(Integer, ForeignKey("pipeline_configs.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(50), default="open", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    board = relationship("PipelineConfig", back_populates="epics")
+    stories = relationship("Story", back_populates="epic")
 
 
 class Story(Base):
@@ -67,6 +90,7 @@ class Story(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     board_id = Column(Integer, ForeignKey("pipeline_configs.id"), nullable=False)
+    epic_id = Column(Integer, ForeignKey("epics.id"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     acceptance_criteria = Column(Text, nullable=True)
@@ -76,7 +100,17 @@ class Story(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @property
+    def input_content(self):
+        """Alias for prd_content for generic input system."""
+        return self.prd_content
+
+    @input_content.setter
+    def input_content(self, value):
+        self.prd_content = value
+
     board = relationship("PipelineConfig", back_populates="stories")
+    epic = relationship("Epic", back_populates="stories")
     tasks = relationship("Task", back_populates="story", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="story", cascade="all, delete-orphan")
 
@@ -90,7 +124,7 @@ class Task(Base):
     description = Column(Text, nullable=True)
     implementation_notes = Column(Text, nullable=True)
     test_scenarios = Column(Text, nullable=True)
-    status = Column(Enum(TaskStatus), default=TaskStatus.DRAFT, nullable=False)
+    status = Column(String(50), default="draft", nullable=False)
     assigned_agent = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

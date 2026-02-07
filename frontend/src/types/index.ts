@@ -1,15 +1,8 @@
 // StoryStatus is now a plain string - columns are defined by the active pipeline
 export type StoryStatus = string;
 
-export type TaskStatus =
-  | 'draft'
-  | 'pending_review'
-  | 'ready_for_development'
-  | 'in_progress'
-  | 'code_review'
-  | 'ready_for_qa'
-  | 'qa_in_progress'
-  | 'done';
+// TaskStatus is now a plain string - sub-item statuses are defined per board
+export type TaskStatus = string;
 
 // Built-in agent types
 export type BuiltinAgentType =
@@ -26,6 +19,7 @@ export type AgentType = BuiltinAgentType | string;
 export interface Story {
   id: number;
   board_id: number;
+  epic_id: number | null;
   title: string;
   description: string | null;
   acceptance_criteria: string | null;
@@ -36,6 +30,17 @@ export interface Story {
   updated_at: string;
   task_count: number;
   completed_task_count: number;
+}
+
+export interface Epic {
+  id: number;
+  board_id: number;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  story_count: number;
 }
 
 export interface Task {
@@ -91,6 +96,12 @@ export interface PipelineTemplate {
   agent_automation: boolean;
   item_noun: string;
   has_tasks: boolean;
+  sub_item_noun: string;
+  input_noun: string;
+  epic_noun: string;
+  input_placeholder?: string;
+  sub_item_statuses?: string[];
+  item_source?: string;
 }
 
 export interface PipelineConfig {
@@ -101,6 +112,12 @@ export interface PipelineConfig {
   agent_automation: boolean;
   item_noun: string;
   has_tasks: boolean;
+  sub_item_noun: string;
+  input_noun: string;
+  epic_noun: string;
+  input_placeholder?: string;
+  sub_item_statuses?: string[];
+  item_source?: string;
   story_count?: number;
 }
 
@@ -127,7 +144,7 @@ export const STORY_STATUS_LABELS: Record<string, string> = {
   done: 'Done',
 };
 
-export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+export const TASK_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   pending_review: 'Pending Review',
   ready_for_development: 'Ready for Dev',
@@ -136,7 +153,18 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   ready_for_qa: 'Ready for QA',
   qa_in_progress: 'QA In Progress',
   done: 'Done',
+  // Non-dev statuses
+  pending: 'Pending',
+  scheduled: 'Scheduled',
+  review: 'Review',
+  identified: 'Identified',
+  verified: 'Verified',
 };
+
+// Helper: get sub-item status label with fallback formatting
+export function getSubItemStatusLabel(status: string): string {
+  return TASK_STATUS_LABELS[status] ?? status.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 
 export const AGENT_LABELS: Record<BuiltinAgentType, string> = {
   product_owner: 'Product Owner',

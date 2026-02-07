@@ -13,7 +13,7 @@ interface StoryState {
   // Actions
   fetchStories: (boardId?: number) => Promise<void>;
   fetchTasks: (storyId?: number) => Promise<void>;
-  fetchAgents: () => Promise<void>;
+  fetchAgents: (boardId?: number) => Promise<void>;
   setSelectedStory: (id: number | null) => void;
   addStory: (story: Story) => void;
   updateStory: (story: Story) => void;
@@ -67,9 +67,9 @@ export const useStoryStore = create<StoryState>((set, get) => ({
     }
   },
 
-  fetchAgents: async () => {
+  fetchAgents: async (boardId?: number) => {
     try {
-      const agentsData = await agentApi.list();
+      const agentsData = await agentApi.list(boardId);
       // Transform backend response to frontend Agent format
       const agents: Agent[] = agentsData.map((a: {
         id: string;

@@ -1,10 +1,9 @@
 """
-LangGraph-based Agent Swarm - Multi-agent orchestration using LangGraph.
+Manager-Worker Agent Swarm - Multi-agent orchestration via A2A communication.
 
 This module provides the swarm orchestration layer that coordinates
-all agents (built-in and dynamic) using LangGraph's StateGraph.
+all agents using a Manager-Worker topology with visible A2A messages.
 """
-from .graph import create_agent_swarm, ScrumSwarm, swarm
-from .state import SwarmState
+from .graph import ScrumSwarm, swarm
 
-__all__ = ["create_agent_swarm", "ScrumSwarm", "SwarmState", "swarm"]
+__all__ = ["ScrumSwarm", "swarm"]

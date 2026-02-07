@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Story, Task, StoryStatus, TaskStatus, PipelineConfig
+from app.db.models import Story, Task, StoryStatus, PipelineConfig
 from app.agents.executor import set_swarm_active, is_swarm_active
 from app.workflow.orchestrator import WorkflowOrchestrator
 
@@ -39,17 +39,17 @@ async def test_story_handler_mapping(orchestrator):
 @pytest.mark.asyncio
 async def test_task_handler_mapping(orchestrator):
     """Test that task status handlers are properly defined."""
-    assert orchestrator.TASK_HANDLERS[TaskStatus.DRAFT] is None
-    assert orchestrator.TASK_HANDLERS[TaskStatus.READY_FOR_DEVELOPMENT] == (
+    assert orchestrator.TASK_HANDLERS["draft"] is None
+    assert orchestrator.TASK_HANDLERS["ready_for_development"] == (
         "developer", "implementation_notes"
     )
-    assert orchestrator.TASK_HANDLERS[TaskStatus.CODE_REVIEW] == (
+    assert orchestrator.TASK_HANDLERS["code_review"] == (
         "code_reviewer", "review_implementation"
     )
-    assert orchestrator.TASK_HANDLERS[TaskStatus.READY_FOR_QA] == (
+    assert orchestrator.TASK_HANDLERS["ready_for_qa"] == (
         "qa", "create_test_scenarios"
     )
-    assert orchestrator.TASK_HANDLERS[TaskStatus.DONE] is None
+    assert orchestrator.TASK_HANDLERS["done"] is None
 
 
 @pytest.mark.asyncio
@@ -84,7 +84,7 @@ async def test_process_task_transition_no_handler(orchestrator, test_session: As
     await test_session.commit()
     await test_session.refresh(story)
 
-    task = Task(story_id=story.id, title="Test Task", status=TaskStatus.DRAFT)
+    task = Task(story_id=story.id, title="Test Task", status="draft")
     test_session.add(task)
     await test_session.commit()
     await test_session.refresh(task)
@@ -94,8 +94,8 @@ async def test_process_task_transition_no_handler(orchestrator, test_session: As
          patch('app.workflow.orchestrator.get_board', new_callable=AsyncMock, return_value=MOCK_AUTOMATION_PIPELINE):
         result = await orchestrator.process_task_transition(
             task,
-            TaskStatus.DRAFT,
-            TaskStatus.DRAFT,
+            "draft",
+            "draft",
             test_session
         )
 
@@ -112,8 +112,13 @@ async def test_all_story_statuses_covered(orchestrator):
 
 @pytest.mark.asyncio
 async def test_all_task_statuses_covered(orchestrator):
-    """Test that all task statuses have a handler defined (even if None)."""
-    for status in TaskStatus:
+    """Test that all expected task statuses have a handler defined (even if None)."""
+    expected_statuses = [
+        "draft", "pending_review", "in_review", "ready_for_development",
+        "in_progress", "code_review", "code_review_in_progress",
+        "ready_for_qa", "qa_in_progress", "done",
+    ]
+    for status in expected_statuses:
         assert status in orchestrator.TASK_HANDLERS, f"Missing handler for {status}"
 
 
