@@ -13,9 +13,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy import select
 
-from app.db.database import async_session_maker
 from app.db.models import Story, Task, PipelineConfig, DynamicAgent
-from app.agents.executor import set_swarm_active
 from app.api.websocket.manager import broadcast_swarm_status
 from app.pipeline.templates import TEMPLATE_WORKFLOWS
 
@@ -68,12 +66,18 @@ ACTION_LABELS = {
 
 
 # ============================================================================
-# Core helpers (kept from previous implementation)
+# Core helpers
 # ============================================================================
+
+def _get_session_maker():
+    """Get the session maker for the current session context."""
+    from app.session import get_current_session_maker
+    return get_current_session_maker()
+
 
 async def get_active_agent_ids() -> set[str]:
     """Get the set of currently active agent IDs from the database."""
-    async with async_session_maker() as db:
+    async with _get_session_maker()() as db:
         result = await db.execute(
             select(DynamicAgent.id).where(DynamicAgent.is_active == True)
         )
@@ -99,7 +103,7 @@ async def scan_board() -> dict:
     pending_stories = []
     pending_tasks = []
 
-    async with async_session_maker() as db:
+    async with _get_session_maker()() as db:
         # Find all boards with automation enabled
         board_result = await db.execute(
             select(PipelineConfig).where(PipelineConfig.agent_automation == True)
@@ -165,7 +169,7 @@ async def scan_board() -> dict:
 
 async def claim_item(item_type: str, item_id: int, expected_status: str) -> bool:
     """Claim an item by updating its timestamp to prevent double-processing."""
-    async with async_session_maker() as db:
+    async with _get_session_maker()() as db:
         if item_type == "story":
             result = await db.execute(select(Story).where(Story.id == item_id))
             item = result.scalar_one_or_none()
@@ -185,17 +189,13 @@ async def claim_item(item_type: str, item_id: int, expected_status: str) -> bool
         return True
 
 
-# Track which agents are currently working
-_working_agents: dict[str, str] = {}  # agent_id -> work_key
-
-
 # ============================================================================
 # Manager-Worker dispatch
 # ============================================================================
 
 async def get_manager_for_board(board_id: int) -> Optional[str]:
     """Get the manager agent ID for a board (e.g., 'scrum_master_1')."""
-    async with async_session_maker() as db:
+    async with _get_session_maker()() as db:
         result = await db.execute(
             select(PipelineConfig.template_id).where(PipelineConfig.id == board_id)
         )
@@ -262,74 +262,6 @@ def build_work_context(work: dict) -> dict:
     return context
 
 
-async def dispatch_one(manager_id: str, worker_id: str, work: dict):
-    """Manager assigns one work item to a worker via A2A.
-
-    The A2A router records the Manager→Worker message in chat,
-    executes the worker agent, and records the Worker→Manager response.
-    The executor handles working/idle status broadcasts.
-    """
-    _working_agents[worker_id] = work["work_key"]
-
-    try:
-        from app.a2a.router import a2a_router
-
-        message = build_assignment_message(work)
-        context = build_work_context(work)
-
-        async with async_session_maker() as db:
-            await a2a_router.send_to_agent(
-                from_agent=manager_id,
-                to_agent=worker_id,
-                message=message,
-                context=context,
-                db=db,
-            )
-
-    except Exception as e:
-        logger.error(f"[Swarm] {manager_id} → {worker_id} failed: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        _working_agents.pop(worker_id, None)
-
-
-async def dispatch_pending_work():
-    """Manager scans boards and dispatches work to workers via A2A.
-
-    For each board with pending work:
-    1. Find the board's manager agent
-    2. For each pending item, send an A2A message from manager to worker
-    3. The A2A router records visible chat messages and executes the worker
-
-    Dispatches one item at a time so chat messages appear naturally staggered.
-    """
-    board_data = await scan_board()
-    active_agents = await get_active_agent_ids()
-
-    # Group work by board_id
-    work_by_board = group_by_board(board_data)
-
-    # For each board, dispatch through its manager — one at a time
-    for board_id, items in work_by_board.items():
-        manager_id = await get_manager_for_board(board_id)
-        if not manager_id or manager_id not in active_agents:
-            continue
-
-        for work in items:
-            worker_id = work["agent"]
-            if worker_id not in active_agents or worker_id in _working_agents:
-                continue
-
-            # Claim the item (prevents double-processing)
-            claimed = await claim_item(work["type"], work["item"]["id"], work["item"]["status"])
-            if not claimed:
-                continue
-
-            # Dispatch: Manager → Worker via A2A (creates chat trail)
-            await dispatch_one(manager_id, worker_id, work)
-
-
 # ============================================================================
 # ScrumSwarm - High-level interface
 # ============================================================================
@@ -337,10 +269,12 @@ async def dispatch_pending_work():
 class ScrumSwarm:
     """High-level interface for the Manager-Worker agent swarm."""
 
-    def __init__(self):
+    def __init__(self, session_id: str = "default"):
         self._running = False
         self._paused = False
         self._task: Optional[asyncio.Task] = None
+        self._session_id = session_id
+        self._working_agents: dict[str, str] = {}  # agent_id -> work_key
 
     @property
     def is_running(self) -> bool:
@@ -356,24 +290,76 @@ class ScrumSwarm:
             return "paused"
         return "running"
 
+    async def dispatch_one(self, manager_id: str, worker_id: str, work: dict):
+        """Manager assigns one work item to a worker via A2A."""
+        self._working_agents[worker_id] = work["work_key"]
+
+        try:
+            from app.session import get_current_a2a_router
+
+            a2a_router = get_current_a2a_router()
+            message = build_assignment_message(work)
+            context = build_work_context(work)
+
+            async with _get_session_maker()() as db:
+                await a2a_router.send_to_agent(
+                    from_agent=manager_id,
+                    to_agent=worker_id,
+                    message=message,
+                    context=context,
+                    db=db,
+                )
+
+        except Exception as e:
+            logger.error(f"[Swarm] {manager_id} → {worker_id} failed: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            self._working_agents.pop(worker_id, None)
+
+    async def dispatch_pending_work(self):
+        """Manager scans boards and dispatches work to workers via A2A."""
+        board_data = await scan_board()
+        active_agents = await get_active_agent_ids()
+
+        work_by_board = group_by_board(board_data)
+
+        for board_id, items in work_by_board.items():
+            manager_id = await get_manager_for_board(board_id)
+            if not manager_id or manager_id not in active_agents:
+                continue
+
+            for work in items:
+                worker_id = work["agent"]
+                if worker_id not in active_agents or worker_id in self._working_agents:
+                    continue
+
+                claimed = await claim_item(work["type"], work["item"]["id"], work["item"]["status"])
+                if not claimed:
+                    continue
+
+                await self.dispatch_one(manager_id, worker_id, work)
+
     async def run_once(self) -> dict:
         """Run one iteration of the swarm — dispatch all pending work."""
-        await dispatch_pending_work()
+        await self.dispatch_pending_work()
         return {}
 
     async def start(self):
         """Start the background monitoring loop."""
+        from app.session import session_manager, _current_session
+        session = session_manager.get_session(self._session_id)
+        if session:
+            session.swarm_active = True
+
         if self._running:
-            # If already running but paused, unpause
             if self._paused:
                 self._paused = False
-                set_swarm_active(True)
                 await broadcast_swarm_status("running")
                 logger.info("[Swarm] Agent swarm resumed")
             return
         self._running = True
         self._paused = False
-        set_swarm_active(True)
         self._task = asyncio.create_task(self._monitor_loop())
         await broadcast_swarm_status("running")
         logger.info("[Swarm] Agent swarm started")
@@ -382,15 +368,19 @@ class ScrumSwarm:
         """Stop the background monitoring loop completely."""
         self._running = False
         self._paused = False
-        set_swarm_active(False)
+
+        from app.session import session_manager
+        session = session_manager.get_session(self._session_id)
+        if session:
+            session.swarm_active = False
+
         if self._task:
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        # Clear working agents
-        _working_agents.clear()
+        self._working_agents.clear()
         await broadcast_swarm_status("stopped")
         logger.info("[Swarm] Agent swarm stopped")
 
@@ -398,7 +388,10 @@ class ScrumSwarm:
         """Pause the swarm (agents stop taking new work)."""
         if self._running and not self._paused:
             self._paused = True
-            set_swarm_active(False)
+            from app.session import session_manager
+            session = session_manager.get_session(self._session_id)
+            if session:
+                session.swarm_active = False
             await broadcast_swarm_status("paused")
             logger.info("[Swarm] Agent swarm paused")
 
@@ -406,29 +399,38 @@ class ScrumSwarm:
         """Resume the swarm after pausing."""
         if self._running and self._paused:
             self._paused = False
-            set_swarm_active(True)
+            from app.session import session_manager
+            session = session_manager.get_session(self._session_id)
+            if session:
+                session.swarm_active = True
             await broadcast_swarm_status("running")
             logger.info("[Swarm] Agent swarm resumed")
 
     async def _monitor_loop(self):
-        """Main monitoring loop."""
-        # Initial delay to let app start up
+        """Main monitoring loop — restores session contextvar each iteration."""
         await asyncio.sleep(3)
 
         while self._running:
             try:
-                # Only run if not paused
                 if not self._paused:
-                    await self.run_once()
+                    # Restore session contextvar so all downstream code
+                    # sees the correct session-scoped DB, executor, etc.
+                    from app.session import session_manager, _current_session
+                    session = session_manager.get_session(self._session_id)
+                    if session:
+                        token = _current_session.set(session)
+                        try:
+                            await self.run_once()
+                        finally:
+                            _current_session.reset(token)
+                    else:
+                        logger.warning(f"[Swarm] Session {self._session_id} not found, stopping")
+                        self._running = False
+                        break
             except Exception as e:
                 logger.error(f"[Swarm] Error: {e}")
                 import traceback
                 traceback.print_exc()
 
-            # Random interval for natural behavior
             interval = random.uniform(3, 6)
             await asyncio.sleep(interval)
-
-
-# Global swarm instance
-swarm = ScrumSwarm()

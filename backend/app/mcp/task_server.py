@@ -24,7 +24,7 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from app.db.database import async_session_maker, init_db
+from app.session import get_current_session_maker
 from app.db.models import Story, Task, Comment, PipelineConfig
 from app.pipeline.templates import get_valid_statuses
 from sqlalchemy.orm import selectinload
@@ -301,7 +301,7 @@ TOOLS = [
 
 async def get_story(story_id: int) -> dict:
     """Fetch a story by ID."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Story).where(Story.id == story_id))
         story = result.scalar_one_or_none()
 
@@ -328,7 +328,7 @@ async def create_story(
     prd_content: str = "",
 ) -> dict:
     """Create a new story on a board."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         board_result = await db.execute(
             select(PipelineConfig).where(PipelineConfig.id == board_id)
         )
@@ -364,7 +364,7 @@ async def create_story(
 
 async def update_story_status(story_id: int, new_status: str) -> dict:
     """Update a story's status."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(
             select(Story).where(Story.id == story_id).options(selectinload(Story.board))
         )
@@ -386,7 +386,7 @@ async def update_story_status(story_id: int, new_status: str) -> dict:
 
 async def list_stories_by_status(status: str) -> list[dict]:
     """List stories by status."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Story).where(Story.status == status))
         stories = result.scalars().all()
 
@@ -403,7 +403,7 @@ async def list_stories_by_status(status: str) -> list[dict]:
 
 async def get_task(task_id: int) -> dict:
     """Fetch a task by ID."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -424,7 +424,7 @@ async def get_task(task_id: int) -> dict:
 
 async def get_tasks_for_story(story_id: int) -> list[dict]:
     """Get all tasks for a story."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.story_id == story_id))
         tasks = result.scalars().all()
 
@@ -443,7 +443,7 @@ async def get_tasks_for_story(story_id: int) -> list[dict]:
 
 async def create_task(story_id: int, title: str, description: str) -> dict:
     """Create a new task."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         task = Task(
             story_id=story_id,
             title=title,
@@ -465,7 +465,7 @@ async def create_task(story_id: int, title: str, description: str) -> dict:
 
 async def update_task_status(task_id: int, new_status: str) -> dict:
     """Update a task's status."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -479,7 +479,7 @@ async def update_task_status(task_id: int, new_status: str) -> dict:
 
 async def update_task_implementation(task_id: int, implementation_notes: str) -> dict:
     """Update task implementation notes."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -493,7 +493,7 @@ async def update_task_implementation(task_id: int, implementation_notes: str) ->
 
 async def update_task_test_scenarios(task_id: int, test_scenarios: str) -> dict:
     """Update task test scenarios."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -507,7 +507,7 @@ async def update_task_test_scenarios(task_id: int, test_scenarios: str) -> dict:
 
 async def list_tasks_by_status(status: str) -> list[dict]:
     """List tasks by status."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.status == status))
         tasks = result.scalars().all()
 
@@ -529,7 +529,7 @@ async def add_comment(
     story_id: int = None,
 ) -> dict:
     """Add a comment to a task or story."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         comment = Comment(
             content=content,
             agent_type=agent_type,
@@ -551,7 +551,7 @@ async def add_comment(
 
 async def get_task_comments(task_id: int) -> list[dict]:
     """Get all comments for a task."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(
             select(Comment).where(Comment.task_id == task_id).order_by(Comment.created_at)
         )
@@ -570,7 +570,7 @@ async def get_task_comments(task_id: int) -> list[dict]:
 
 async def get_board_summary() -> dict:
     """Get a summary of all boards."""
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         from sqlalchemy import func
 
         # Get all boards
@@ -693,9 +693,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
 
 async def main():
     """Run the MCP server."""
-    # Initialize the database
-    await init_db()
-    logger.info("Database initialized")
+    logger.info("MCP server starting (requires session context)")
 
     # Run the server
     logger.info("Starting Agent Scrum Tasks MCP Server...")

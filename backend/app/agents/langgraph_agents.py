@@ -15,8 +15,6 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage, AIMessage
 from langchain_core.language_models.base import BaseLanguageModel
 
-from app.config import get_settings
-
 logger = logging.getLogger(__name__)
 from app.agents.tools.db_tools import (
     get_story,
@@ -35,46 +33,44 @@ from app.agents.tools.db_tools import (
     list_tasks_by_status,
 )
 
-settings = get_settings()
-
-# Cache for the model instance
-_model_instance: Optional[BaseLanguageModel] = None
-
-
 def is_simulation_mode() -> bool:
     """Check if we should run in simulation mode."""
-    return settings.simulate_mode or not settings.gemini_api_key
+    try:
+        from app.session import get_current_session, get_current_api_key
+        session = get_current_session()
+        api_key = get_current_api_key()
+        return session.simulate_mode or not api_key
+    except LookupError:
+        return True
 
 
 def get_model(model_name: str = None):
-    """Get a configured LLM instance.
+    """Get a configured LLM instance per-call using API key from contextvar.
 
     If simulate_mode is enabled or no API key is available, returns None
     and agents will use simulation mode.
     """
-    global _model_instance
+    from app.config import get_settings
+    settings = get_settings()
 
-    # Use configured model name if not specified
     if model_name is None:
         model_name = settings.gemini_model or "gemini-2.0-flash"
 
-    # Check if we should use simulation mode
     if is_simulation_mode():
         return None
 
-    # Return cached instance if available
-    if _model_instance is not None:
-        return _model_instance
+    from app.session import get_current_api_key
+    api_key = get_current_api_key()
+    if not api_key:
+        return None
 
-    # Import here to avoid import errors when API key not available
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    _model_instance = ChatGoogleGenerativeAI(
+    return ChatGoogleGenerativeAI(
         model=model_name,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
         temperature=0.7,
     )
-    return _model_instance
 
 
 class SimulatedAgent:
@@ -713,10 +709,10 @@ This task involves implementing the required functionality as specified.
         template_id = None
         if board_id:
             try:
-                from app.db.database import async_session_maker
+                from app.session import get_current_session_maker
                 from app.db.models import PipelineConfig
                 from sqlalchemy import select
-                async with async_session_maker() as db:
+                async with get_current_session_maker()() as db:
                     result = await db.execute(
                         select(PipelineConfig.template_id).where(PipelineConfig.id == board_id)
                     )

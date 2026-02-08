@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Story, Task, SoftwareDevStatus
-from app.agents.executor import executor
+from app.session import get_current_executor
 from app.api.websocket.manager import broadcast_agent_activity
 from app.pipeline.templates import get_board, TEMPLATE_WORKFLOWS
 
@@ -85,7 +85,7 @@ class WorkflowOrchestrator:
         }
 
         try:
-            result = await executor.execute_agent(
+            result = await get_current_executor().execute_agent(
                 agent_id=agent_id,
                 message=f"Process story #{story.id}: {story.title}",
                 context=context,
@@ -144,7 +144,7 @@ class WorkflowOrchestrator:
         }
 
         try:
-            result = await executor.execute_agent(
+            result = await get_current_executor().execute_agent(
                 agent_id=agent_id,
                 message=f"Process task #{task.id}: {task.title}",
                 context=context,

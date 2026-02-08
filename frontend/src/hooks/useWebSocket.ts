@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useStoryStore } from '../store/storyStore';
 import { usePipelineStore } from '../store/pipelineStore';
+import { getSessionId } from '../api/client';
 import type { Story, Task, AgentType, PipelineConfig } from '../types';
 
 interface WebSocketMessage {
@@ -18,7 +19,7 @@ export function useWebSocket() {
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?session_id=${getSessionId()}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
