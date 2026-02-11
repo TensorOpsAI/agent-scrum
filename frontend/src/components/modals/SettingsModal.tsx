@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Key, Loader2, CheckCircle, AlertCircle, ExternalLink, Trash2, Play, Square, Pause, XCircle } from 'lucide-react';
+import { X, Key, Loader2, CheckCircle, AlertCircle, ExternalLink, Trash2, XCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { settingsApi, type AppSettings } from '../../api/client';
 import { usePipelineStore } from '../../store/pipelineStore';
@@ -15,15 +15,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [isSwarmActionLoading, setIsSwarmActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const activeConfig = usePipelineStore((s) => s.activeConfig);
 
+  // Reload settings when modal opens or when the active board changes
   useEffect(() => {
     if (isOpen) {
       loadSettings();
     }
-  }, [isOpen]);
+  }, [isOpen, activeConfig?.id]);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -122,37 +122,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
-  const handleSwarmAction = async (action: 'start' | 'stop' | 'pause' | 'resume') => {
-    setIsSwarmActionLoading(true);
-    setMessage(null);
-
-    try {
-      let result;
-      switch (action) {
-        case 'start':
-          result = await settingsApi.startSwarm();
-          break;
-        case 'stop':
-          result = await settingsApi.stopSwarm();
-          break;
-        case 'pause':
-          result = await settingsApi.pauseSwarm();
-          break;
-        case 'resume':
-          result = await settingsApi.resumeSwarm();
-          break;
-      }
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message });
-        loadSettings();
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: `Failed to ${action} swarm` });
-    } finally {
-      setIsSwarmActionLoading(false);
-    }
-  };
-
   if (!isOpen) return null;
 
   const automationEnabled = activeConfig?.agent_automation === true;
@@ -168,7 +137,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 shrink-0">
           <div className="flex items-center gap-3">
             <Key className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-white">Settings</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Settings</h2>
+              {activeConfig && (
+                <p className="text-xs text-gray-400">
+                  Board: <span className="text-blue-400">{activeConfig.name}</span>
+                </p>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -215,16 +191,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 )}>
                   {settings?.simulate_mode ? 'Simulation Mode' : 'Live Mode'}
                 </div>
-                {automationEnabled && (
-                  <div className={clsx(
-                    'px-3 py-1.5 rounded-full',
-                    settings?.swarm_status === 'running' ? 'bg-green-900/30 text-green-400' :
-                    settings?.swarm_status === 'paused' ? 'bg-yellow-900/30 text-yellow-400' :
-                    'bg-red-900/30 text-red-400'
-                  )}>
-                    Swarm: {settings?.swarm_status || 'stopped'}
-                  </div>
-                )}
               </div>
 
               {/* API Key Section */}
@@ -271,55 +237,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </a>
                 </p>
               </div>
-
-              {/* Swarm Controls - only show when automation is enabled */}
-              {automationEnabled && (
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-gray-300 mb-3">Agent Swarm</h3>
-                  <div className="flex gap-2">
-                    {settings?.swarm_status === 'stopped' ? (
-                      <button
-                        onClick={() => handleSwarmAction('start')}
-                        disabled={isSwarmActionLoading}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-                      >
-                        {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                        Start Swarm
-                      </button>
-                    ) : (
-                      <>
-                        {settings?.swarm_status === 'paused' ? (
-                          <button
-                            onClick={() => handleSwarmAction('resume')}
-                            disabled={isSwarmActionLoading}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-                          >
-                            {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            Resume
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleSwarmAction('pause')}
-                            disabled={isSwarmActionLoading}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-yellow-600 hover:bg-yellow-700 text-white disabled:opacity-50"
-                          >
-                            {isSwarmActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
-                            Pause
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleSwarmAction('stop')}
-                          disabled={isSwarmActionLoading}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                        >
-                          <Square className="w-4 h-4" />
-                          Stop
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Simulation Mode - only show when automation is enabled */}
               {automationEnabled && (
