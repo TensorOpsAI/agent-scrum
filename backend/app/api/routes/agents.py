@@ -10,7 +10,14 @@ from sqlalchemy import select
 
 from app.db.database import get_db
 from app.db.models import DynamicAgent
-from app.agents.swarm.graph import _working_agents
+def _get_working_agents() -> dict:
+    """Get working agents dict from session-scoped swarm."""
+    try:
+        from app.session import get_current_swarm
+        swarm = get_current_swarm()
+        return swarm._working_agents
+    except LookupError:
+        return {}
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -32,9 +39,10 @@ async def list_agents(
     agents = []
     for agent in db_agents:
         # Determine status based on working agents
-        is_working = agent.id in _working_agents
+        working = _get_working_agents()
+        is_working = agent.id in working
         status = "working" if is_working else "idle"
-        current_task = _working_agents.get(agent.id) if is_working else None
+        current_task = working.get(agent.id) if is_working else None
 
         agents.append({
             "id": agent.id,
@@ -61,9 +69,10 @@ async def get_agent_info(agent_id: str, db: AsyncSession = Depends(get_db)):
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
 
-    is_working = agent.id in _working_agents
+    working = _get_working_agents()
+    is_working = agent.id in working
     status = "working" if is_working else "idle"
-    current_task = _working_agents.get(agent.id) if is_working else None
+    current_task = working.get(agent.id) if is_working else None
 
     return {
         "id": agent.id,
@@ -88,9 +97,10 @@ async def get_agent_status(agent_id: str, db: AsyncSession = Depends(get_db)):
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
 
-    is_working = agent.id in _working_agents
+    working = _get_working_agents()
+    is_working = agent.id in working
     status = "working" if is_working else "idle"
-    current_task = _working_agents.get(agent.id) if is_working else None
+    current_task = working.get(agent.id) if is_working else None
 
     return {
         "id": agent.id,

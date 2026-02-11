@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.models import Story, Task
-from app.agents.executor import executor
+from app.session import get_current_executor
 from app.api.websocket.manager import broadcast_agent_activity
 from app.pipeline.templates import get_board, get_template_by_id
 
@@ -81,7 +81,7 @@ async def on_input_submitted(
 
     logger.info(f"[TRIGGER] Calling executor.execute_agent for {intake_agent}...")
     try:
-        result = await executor.execute_agent(
+        result = await get_current_executor().execute_agent(
             agent_id=intake_agent,
             message=content,
             context=context,

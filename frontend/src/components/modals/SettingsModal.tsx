@@ -29,6 +29,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setIsLoading(true);
     try {
       const data = await settingsApi.get();
+      // Merge with local API key state
+      const localApiKey = settingsApi.getLocalApiKey();
+      data.has_api_key = !!localApiKey;
       setSettings(data);
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -37,29 +40,28 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
-  const handleSaveApiKey = async () => {
+  const handleSaveApiKey = () => {
     if (!apiKey.trim()) return;
 
     setIsSaving(true);
     setMessage(null);
 
     try {
-      const result = await settingsApi.updateApiKey(apiKey);
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message });
-        setApiKey('');
-        loadSettings();
-      } else {
-        setMessage({ type: 'error', text: result.message });
+      const result = settingsApi.saveApiKeyLocally(apiKey);
+      setMessage({ type: 'success', text: result.message });
+      setApiKey('');
+      // Update has_api_key in local settings state
+      if (settings) {
+        setSettings({ ...settings, has_api_key: true, simulate_mode: false });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update API key' });
+      setMessage({ type: 'error', text: 'Failed to save API key' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleClearApiKey = async () => {
+  const handleClearApiKey = () => {
     if (!confirm('Are you sure you want to clear the API key? The system will switch to simulation mode.')) {
       return;
     }
@@ -68,12 +70,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setMessage(null);
 
     try {
-      const result = await settingsApi.clearApiKey();
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message });
-        loadSettings();
-      } else {
-        setMessage({ type: 'error', text: result.message });
+      const result = settingsApi.clearApiKeyLocally();
+      setMessage({ type: 'success', text: result.message });
+      if (settings) {
+        setSettings({ ...settings, has_api_key: false, simulate_mode: true });
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to clear API key' });
@@ -369,7 +369,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-gray-700 bg-gray-850 shrink-0">
           <p className="text-xs text-gray-500 text-center">
-            API key is stored in memory only and clears on server restart.
+            API key is stored in your browser only and never sent to the server for storage.
           </p>
         </div>
       </div>

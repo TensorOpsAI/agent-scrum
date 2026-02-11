@@ -1,21 +1,5 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-
-from app.config import get_settings
-
-settings = get_settings()
-
-engine = create_async_engine(
-    settings.database_url,
-    echo=False,
-    connect_args={"check_same_thread": False}
-)
-
-async_session_maker = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
 
 
 class Base(DeclarativeBase):
@@ -23,7 +7,9 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncSession:
-    async with async_session_maker() as session:
+    from app.session import get_current_session_maker
+    maker = get_current_session_maker()
+    async with maker() as session:
         try:
             yield session
         finally:
@@ -55,8 +41,11 @@ async def _run_migrations(conn):
             pass
 
 
-async def init_db():
-    """Initialize the database and seed default agents."""
+async def init_db(engine: AsyncEngine, session_maker: async_sessionmaker[AsyncSession]):
+    """Initialize the database and seed default agents.
+
+    Called by SessionManager when creating a new session.
+    """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -66,5 +55,5 @@ async def init_db():
 
     # Seed default agents if they don't exist
     from app.db.seed import seed_default_agents
-    async with async_session_maker() as db:
+    async with session_maker() as db:
         await seed_default_agents(db)

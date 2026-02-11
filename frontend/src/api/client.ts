@@ -8,6 +8,28 @@ const api = axios.create({
   },
 });
 
+// Generate a unique session ID per browser tab (dies when tab closes)
+function getSessionId(): string {
+  let id = sessionStorage.getItem('agent_scrum_session_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem('agent_scrum_session_id', id);
+  }
+  return id;
+}
+
+// Attach session ID and API key on every request
+api.interceptors.request.use((config) => {
+  config.headers['X-Session-Id'] = getSessionId();
+  const apiKey = sessionStorage.getItem('gemini_api_key');
+  if (apiKey) {
+    config.headers['X-Api-Key'] = apiKey;
+  }
+  return config;
+});
+
+export { getSessionId };
+
 // Story API
 export const storyApi = {
   list: async (boardId?: number, status?: StoryStatus): Promise<Story[]> => {
@@ -219,14 +241,18 @@ export const settingsApi = {
     return response.data;
   },
 
-  updateApiKey: async (apiKey: string): Promise<{ success: boolean; message: string; simulate_mode: boolean }> => {
-    const response = await api.post('/settings/api-key', { api_key: apiKey });
-    return response.data;
+  saveApiKeyLocally: (apiKey: string): { success: boolean; message: string; simulate_mode: boolean } => {
+    sessionStorage.setItem('gemini_api_key', apiKey);
+    return { success: true, message: 'API key saved in browser', simulate_mode: false };
   },
 
-  clearApiKey: async (): Promise<{ success: boolean; message: string; simulate_mode: boolean }> => {
-    const response = await api.delete('/settings/api-key');
-    return response.data;
+  clearApiKeyLocally: (): { success: boolean; message: string; simulate_mode: boolean } => {
+    sessionStorage.removeItem('gemini_api_key');
+    return { success: true, message: 'API key cleared', simulate_mode: true };
+  },
+
+  getLocalApiKey: (): string | null => {
+    return sessionStorage.getItem('gemini_api_key');
   },
 
   setSimulateMode: async (enabled: boolean): Promise<{ success: boolean; simulate_mode: boolean }> => {

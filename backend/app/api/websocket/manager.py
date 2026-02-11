@@ -5,41 +5,67 @@ from dataclasses import dataclass, field
 import asyncio
 
 
+def _get_session_id() -> str:
+    """Get session_id from contextvar, fallback to 'global'."""
+    try:
+        from app.session import get_current_session
+        return get_current_session().id
+    except LookupError:
+        return "global"
+
+
 @dataclass
 class ConnectionManager:
-    active_connections: list[WebSocket] = field(default_factory=list)
+    _rooms: dict[str, list[WebSocket]] = field(default_factory=dict)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, session_id: str = "global"):
         await websocket.accept()
         async with self._lock:
-            self.active_connections.append(websocket)
+            if session_id not in self._rooms:
+                self._rooms[session_id] = []
+            self._rooms[session_id].append(websocket)
 
-    async def disconnect(self, websocket: WebSocket):
+    async def disconnect(self, websocket: WebSocket, session_id: str = "global"):
         async with self._lock:
-            if websocket in self.active_connections:
-                self.active_connections.remove(websocket)
+            if session_id in self._rooms:
+                if websocket in self._rooms[session_id]:
+                    self._rooms[session_id].remove(websocket)
+                if not self._rooms[session_id]:
+                    del self._rooms[session_id]
 
-    async def broadcast(self, event: str, data: Any):
+    async def broadcast(self, event: str, data: Any, session_id: str | None = None):
+        if session_id is None:
+            session_id = _get_session_id()
         message = json.dumps({"event": event, "data": data})
         async with self._lock:
-            connections = list(self.active_connections)
+            connections = list(self._rooms.get(session_id, []))
 
         for connection in connections:
             try:
                 await connection.send_text(message)
             except Exception:
-                await self.disconnect(connection)
+                await self.disconnect(connection, session_id)
 
     async def send_personal(self, websocket: WebSocket, event: str, data: Any):
         message = json.dumps({"event": event, "data": data})
         try:
             await websocket.send_text(message)
         except Exception:
-            await self.disconnect(websocket)
+            pass
+
+    async def remove_session(self, session_id: str):
+        """Remove all connections for a session."""
+        async with self._lock:
+            connections = self._rooms.pop(session_id, [])
+        for ws in connections:
+            try:
+                await ws.close()
+            except Exception:
+                pass
 
 
-# Singleton instance
+# Singleton instance (routes by room)
 manager = ConnectionManager()
 
 

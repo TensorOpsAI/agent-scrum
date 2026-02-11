@@ -8,7 +8,7 @@ from typing import Optional
 
 from app.db.database import get_db
 from app.db.models import AgentMessage
-from app.a2a.router import a2a_router, AGENT_NAMES
+from app.a2a.router import AGENT_NAMES
 from app.a2a.registry import registry
 from app.agents.langgraph_agents import AGENT_FACTORIES, get_agent
 
@@ -106,6 +106,8 @@ async def send_message(
 
     try:
         # Send via A2A router
+        from app.session import get_current_a2a_router
+        a2a_router = get_current_a2a_router()
         result_task = await a2a_router.send_to_agent(
             from_agent="client",
             to_agent=to_agent,

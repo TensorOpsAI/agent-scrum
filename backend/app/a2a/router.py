@@ -17,7 +17,6 @@ from app.schemas.a2a import (
     DataPart,
 )
 from app.a2a.registry import registry
-from app.agents.executor import executor
 from app.api.websocket.manager import broadcast_agent_chat
 
 
@@ -50,20 +49,7 @@ class A2ARouter:
         session_id: str | None = None,
         task_id: str | None = None,
     ) -> A2ATask:
-        """Send an A2A message from one agent to another.
-
-        Args:
-            from_agent: Sending agent ID (e.g., "product_owner")
-            to_agent: Target agent ID
-            message: Message text
-            context: Additional context (story_id, task_id, etc.)
-            db: Database session
-            session_id: Optional session ID for conversation threading
-            task_id: Optional existing task ID for follow-up
-
-        Returns:
-            A2ATask with the response
-        """
+        """Send an A2A message from one agent to another."""
         # Generate IDs
         if not task_id:
             task_id = f"a2a-{uuid.uuid4().hex[:12]}"
@@ -86,8 +72,11 @@ class A2ARouter:
             message_type="a2a_request",
         )
 
-        # Execute the target agent
+        # Execute the target agent via session-scoped executor
         try:
+            from app.session import get_current_executor
+            executor = get_current_executor()
+
             result = await executor.execute_agent(
                 agent_id=to_agent,
                 message=message,
@@ -170,7 +159,6 @@ class A2ARouter:
         message_type: str = "a2a",
     ):
         """Record an A2A message in the chat for visibility."""
-        # Store agent IDs as strings directly (columns are now String(50))
         message = AgentMessage(
             from_agent=from_agent,
             to_agent=to_agent,
@@ -207,10 +195,10 @@ class A2ARouter:
             return AGENT_NAMES[agent_id]
         # Look up from DynamicAgent table
         try:
-            from app.db.database import async_session_maker
+            from app.session import get_current_session_maker
             from app.db.models import DynamicAgent
             from sqlalchemy import select
-            async with async_session_maker() as db:
+            async with get_current_session_maker()() as db:
                 result = await db.execute(
                     select(DynamicAgent.name).where(DynamicAgent.id == agent_id)
                 )
@@ -218,7 +206,3 @@ class A2ARouter:
                 return name or agent_id.replace("_", " ").title()
         except Exception:
             return agent_id.replace("_", " ").title()
-
-
-# Global router instance
-a2a_router = A2ARouter()

@@ -9,7 +9,7 @@ from langchain_core.tools import tool
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.db.database import async_session_maker
+from app.session import get_current_session_maker
 from app.db.models import Story, Task, Comment, Epic
 from app.pipeline.templates import get_valid_statuses
 
@@ -31,7 +31,7 @@ async def get_story(story_id: int) -> dict:
         Dictionary with story details including title, description,
         acceptance_criteria, status, and priority.
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Story).where(Story.id == story_id))
         story = result.scalar_one_or_none()
 
@@ -61,7 +61,7 @@ async def update_story_status(story_id: int, new_status: str) -> dict:
     Returns:
         Success/failure message
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(
             select(Story).where(Story.id == story_id).options(selectinload(Story.board))
         )
@@ -121,7 +121,7 @@ async def create_story(
     """
     logger.info(f"[TOOL:create_story] Called with title: {title[:50]}..., board_id: {board_id}")
     try:
-        async with async_session_maker() as db:
+        async with get_current_session_maker()() as db:
             # Get board to determine default status
             from app.db.models import PipelineConfig
             board_result = await db.execute(
@@ -190,7 +190,7 @@ async def list_stories_by_status(status: str, board_id: Optional[int] = None) ->
     Returns:
         List of stories with that status
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         query = select(Story).where(Story.status == status)
         if board_id is not None:
             query = query.where(Story.board_id == board_id)
@@ -224,7 +224,7 @@ async def get_task(task_id: int) -> dict:
         Dictionary with task details including title, description,
         implementation_notes, test_scenarios, and status.
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -253,7 +253,7 @@ async def get_tasks_for_story(story_id: int) -> list[dict]:
     Returns:
         List of tasks belonging to the story
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.story_id == story_id))
         tasks = result.scalars().all()
 
@@ -286,7 +286,7 @@ async def create_task(
     Returns:
         The created task details
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         task = Task(
             story_id=story_id,
             title=title,
@@ -328,7 +328,7 @@ async def update_task_status(task_id: int, new_status: str) -> dict:
     Returns:
         Success/failure message
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -365,7 +365,7 @@ async def update_task_implementation(task_id: int, implementation_notes: str) ->
     Returns:
         Success/failure message
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -402,7 +402,7 @@ async def update_task_test_scenarios(task_id: int, test_scenarios: str) -> dict:
     Returns:
         Success/failure message
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
 
@@ -438,7 +438,7 @@ async def list_tasks_by_status(status: str) -> list[dict]:
     Returns:
         List of tasks with that status
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Task).where(Task.status == status))
         tasks = result.scalars().all()
 
@@ -469,7 +469,7 @@ async def create_epic(title: str, board_id: int, description: str = "") -> dict:
     Returns:
         The created epic details
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         epic = Epic(
             board_id=board_id,
             title=title,
@@ -498,7 +498,7 @@ async def get_epic(epic_id: int) -> dict:
     Returns:
         Dictionary with epic details.
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(select(Epic).where(Epic.id == epic_id))
         epic = result.scalar_one_or_none()
 
@@ -524,7 +524,7 @@ async def list_epics(board_id: Optional[int] = None) -> list[dict]:
     Returns:
         List of epics
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         query = select(Epic)
         if board_id is not None:
             query = query.where(Epic.board_id == board_id)
@@ -564,7 +564,7 @@ async def add_comment(
     Returns:
         The created comment details
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         comment = Comment(
             content=content,
             agent_type=agent_type,  # String column - accepts any agent ID
@@ -594,7 +594,7 @@ async def get_task_comments(task_id: int) -> list[dict]:
     Returns:
         List of comments on the task
     """
-    async with async_session_maker() as db:
+    async with get_current_session_maker()() as db:
         result = await db.execute(
             select(Comment).where(Comment.task_id == task_id).order_by(Comment.created_at)
         )
