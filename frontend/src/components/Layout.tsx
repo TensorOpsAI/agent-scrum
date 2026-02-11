@@ -1,23 +1,28 @@
 import { Outlet } from 'react-router-dom';
-import { Bot, Plus, Settings, Users, AlertCircle, X, Sparkles } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Bot, Plus, Settings, Users, AlertCircle, X, Sparkles, Key, Play, Square, Pause, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { PRDInputModal } from './modals/PRDInputModal';
 import { SettingsModal } from './modals/SettingsModal';
 import { PipelineModal } from './modals/PipelineModal';
+import { WelcomeModal, isOnboardingComplete } from './modals/WelcomeModal';
 import { AgentPanel } from './agents/AgentPanel';
 import { AgentManager } from './agents/AgentManager';
 import { ChatPanel } from './chat/ChatPanel';
 import { StoryDetail } from './story/StoryDetail';
 import { useStoryStore } from '../store/storyStore';
 import { usePipelineStore } from '../store/pipelineStore';
-import { storyApi, simulateApi } from '../api/client';
+import { storyApi, simulateApi, settingsApi } from '../api/client';
 
 export function Layout() {
   const [isPRDModalOpen, setIsPRDModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
   const [isAgentManagerOpen, setIsAgentManagerOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(!isOnboardingComplete());
+  const [hasApiKey, setHasApiKey] = useState(!!settingsApi.getLocalApiKey());
+  const [swarmStatus, setSwarmStatus] = useState<'running' | 'stopped' | 'paused'>('stopped');
+  const [isSwarmLoading, setIsSwarmLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -41,6 +46,47 @@ export function Layout() {
       fetchStories(currentBoardId);
     }
   }, [currentBoardId, fetchStories]);
+
+  // Re-check API key when settings modal closes or welcome modal closes
+  useEffect(() => {
+    if (!isSettingsModalOpen && !isWelcomeOpen) {
+      setHasApiKey(!!settingsApi.getLocalApiKey());
+    }
+  }, [isSettingsModalOpen, isWelcomeOpen]);
+
+  // Fetch swarm status on mount and when board changes
+  const fetchSwarmStatus = useCallback(async () => {
+    try {
+      const res = await settingsApi.getSwarmStatus();
+      setSwarmStatus(res.status);
+    } catch {
+      // ignore – backend may not be ready yet
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSwarmStatus();
+  }, [fetchSwarmStatus, currentBoardId]);
+
+  const handleSwarmAction = useCallback(async (action: 'start' | 'stop' | 'pause' | 'resume') => {
+    setIsSwarmLoading(true);
+    try {
+      let result;
+      switch (action) {
+        case 'start':  result = await settingsApi.startSwarm(); break;
+        case 'stop':   result = await settingsApi.stopSwarm(); break;
+        case 'pause':  result = await settingsApi.pauseSwarm(); break;
+        case 'resume': result = await settingsApi.resumeSwarm(); break;
+      }
+      if (result.success) {
+        await fetchSwarmStatus();
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} swarm:`, error);
+    } finally {
+      setIsSwarmLoading(false);
+    }
+  }, [fetchSwarmStatus]);
 
   // Auto-clear error after 3 seconds
   useEffect(() => {
@@ -149,6 +195,59 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-3 relative flex-shrink-0">
+            {/* Swarm Controls - visible when automation enabled */}
+            {automationEnabled && (
+              <div className="flex items-center gap-1.5">
+                {swarmStatus === 'stopped' ? (
+                  <button
+                    onClick={() => handleSwarmAction('start')}
+                    disabled={isSwarmLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                    title="Start Swarm"
+                  >
+                    {isSwarmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    Start
+                  </button>
+                ) : (
+                  <>
+                    <div className={clsx(
+                      'px-2 py-1 rounded text-xs font-medium',
+                      swarmStatus === 'running' ? 'bg-green-900/40 text-green-400' : 'bg-yellow-900/40 text-yellow-400'
+                    )}>
+                      {swarmStatus === 'running' ? 'Running' : 'Paused'}
+                    </div>
+                    {swarmStatus === 'paused' ? (
+                      <button
+                        onClick={() => handleSwarmAction('resume')}
+                        disabled={isSwarmLoading}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                        title="Resume Swarm"
+                      >
+                        {isSwarmLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSwarmAction('pause')}
+                        disabled={isSwarmLoading}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-yellow-600 hover:bg-yellow-700 text-white disabled:opacity-50 transition-colors"
+                        title="Pause Swarm"
+                      >
+                        {isSwarmLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleSwarmAction('stop')}
+                      disabled={isSwarmLoading}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors"
+                      title="Stop Swarm"
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             {automationEnabled && (
               <button
                 onClick={() => setIsAgentManagerOpen(true)}
@@ -212,6 +311,27 @@ export function Layout() {
         </div>
       </header>
 
+      {/* API Key Missing Banner */}
+      {!hasApiKey && (
+        <div className="flex-shrink-0 bg-amber-900/40 border-b border-amber-700/50 px-6 py-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-amber-200 text-sm">
+              <Key className="w-4 h-4 flex-shrink-0" />
+              <span>
+                <strong>No API key configured.</strong> Agents won't be able to process items without a Gemini API key.
+              </span>
+            </div>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors whitespace-nowrap"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Open Settings
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main content with panels */}
       <div className="flex-1 flex min-h-0">
         {/* Main content area - Kanban board */}
@@ -259,6 +379,16 @@ export function Layout() {
           onClose={() => setSelectedStory(null)}
         />
       )}
+
+      {/* Welcome / Onboarding Modal */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        onClose={() => setIsWelcomeOpen(false)}
+        onOpenSettings={() => {
+          setIsWelcomeOpen(false);
+          setIsSettingsModalOpen(true);
+        }}
+      />
 
       {/* Agent Manager Modal */}
       {isAgentManagerOpen && (

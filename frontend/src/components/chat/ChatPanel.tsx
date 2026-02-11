@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MessageSquare, Bot, ArrowRight, Send, User } from 'lucide-react';
 import { clsx } from 'clsx';
 import { chatApi, type ChatMessage } from '../../api/client';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { useStoryStore } from '../../store/storyStore';
 
-const AGENT_COLORS: Record<string, string> = {
+const BUILTIN_AGENT_COLORS: Record<string, string> = {
   product_owner: 'text-purple-400',
   tech_lead: 'text-blue-400',
   developer: 'text-green-400',
@@ -13,7 +14,7 @@ const AGENT_COLORS: Record<string, string> = {
   client: 'text-cyan-400',
 };
 
-const AGENT_BG_COLORS: Record<string, string> = {
+const BUILTIN_AGENT_BG_COLORS: Record<string, string> = {
   product_owner: 'bg-purple-500/20',
   tech_lead: 'bg-blue-500/20',
   developer: 'bg-green-500/20',
@@ -22,13 +23,13 @@ const AGENT_BG_COLORS: Record<string, string> = {
   client: 'bg-cyan-500/20',
 };
 
-const AVAILABLE_AGENTS = [
-  { id: 'product_owner', name: 'Product Owner' },
-  { id: 'tech_lead', name: 'Tech Lead' },
-  { id: 'developer', name: 'Developer' },
-  { id: 'code_reviewer', name: 'Code Reviewer' },
-  { id: 'qa', name: 'QA' },
-];
+function getAgentTextColor(agentId: string): string {
+  return BUILTIN_AGENT_COLORS[agentId] || 'text-gray-400';
+}
+
+function getAgentBgColor(agentId: string): string {
+  return BUILTIN_AGENT_BG_COLORS[agentId] || 'bg-gray-600';
+}
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -47,23 +48,23 @@ function ChatMessageItem({ message }: ChatMessageItemProps) {
       <div className="flex items-start gap-3">
         <div className={clsx(
           'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-          AGENT_BG_COLORS[message.from_agent] || 'bg-gray-600'
+          getAgentBgColor(message.from_agent)
         )}>
           {isHuman ? (
-            <User className={clsx('w-4 h-4', AGENT_COLORS[message.from_agent] || 'text-gray-400')} />
+            <User className={clsx('w-4 h-4', getAgentTextColor(message.from_agent))} />
           ) : (
-            <Bot className={clsx('w-4 h-4', AGENT_COLORS[message.from_agent] || 'text-gray-400')} />
+            <Bot className={clsx('w-4 h-4', getAgentTextColor(message.from_agent))} />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={clsx('font-medium text-sm', AGENT_COLORS[message.from_agent] || 'text-gray-400')}>
+            <span className={clsx('font-medium text-sm', getAgentTextColor(message.from_agent))}>
               {message.from_agent_name}
             </span>
             {message.to_agent && (
               <>
                 <ArrowRight className="w-3 h-3 text-gray-500" />
-                <span className={clsx('text-sm', AGENT_COLORS[message.to_agent] || 'text-gray-400')}>
+                <span className={clsx('text-sm', getAgentTextColor(message.to_agent))}>
                   @{message.to_agent_name}
                 </span>
               </>
@@ -105,6 +106,13 @@ export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { lastMessage } = useWebSocket();
+  const storeAgents = useStoryStore((s) => s.agents);
+
+  // Derive available agents from the store (board-specific)
+  const availableAgents = useMemo(
+    () => storeAgents.map((a) => ({ id: a.id, name: a.name })),
+    [storeAgents]
+  );
 
   // Load initial messages
   useEffect(() => {
@@ -178,7 +186,7 @@ export function ChatPanel() {
 
   const selectAgent = useCallback((agentId: string) => {
     setTargetAgent(agentId);
-    const agentName = AVAILABLE_AGENTS.find(a => a.id === agentId)?.name || agentId;
+    const agentName = availableAgents.find(a => a.id === agentId)?.name || agentId;
     // Remove the @ prefix if present and add the agent mention
     const newValue = inputValue.startsWith('@')
       ? inputValue.replace(/^@\S*\s*/, `@${agentName} `)
@@ -229,13 +237,13 @@ export function ChatPanel() {
             <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700">
               Select an agent to message
             </div>
-            {AVAILABLE_AGENTS.map((agent) => (
+            {availableAgents.map((agent) => (
               <button
                 key={agent.id}
                 onClick={() => selectAgent(agent.id)}
                 className={clsx(
                   'w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-700 transition-colors',
-                  AGENT_COLORS[agent.id]
+                  getAgentTextColor(agent.id)
                 )}
               >
                 <Bot className="w-4 h-4" />
@@ -251,10 +259,10 @@ export function ChatPanel() {
             <span className="text-xs text-gray-400">Sending to:</span>
             <span className={clsx(
               'px-2 py-0.5 rounded text-xs font-medium',
-              AGENT_BG_COLORS[targetAgent],
-              AGENT_COLORS[targetAgent]
+              getAgentBgColor(targetAgent),
+              getAgentTextColor(targetAgent)
             )}>
-              {AVAILABLE_AGENTS.find(a => a.id === targetAgent)?.name || targetAgent}
+              {availableAgents.find(a => a.id === targetAgent)?.name || targetAgent}
             </span>
             <button
               onClick={() => setTargetAgent('')}
