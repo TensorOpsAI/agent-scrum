@@ -15,7 +15,7 @@ steps:
       - --allow-unauthenticated
       - --session-affinity
       - --min-instances=0
-      - --max-instances=10
+      - --max-instances=5
       - --port=8080
       - --memory=1Gi
       - --cpu=1
