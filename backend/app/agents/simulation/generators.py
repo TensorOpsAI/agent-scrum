@@ -141,7 +141,56 @@ def generate_incidents(count: int = 5, context: Optional[str] = None) -> list[di
     return items
 
 
+NEWS_BRIEF_POOL = [
+    {"topic": "AI in Healthcare", "developments": ["FDA approves first AI diagnostic tool for cancer screening", "Major hospital networks adopting AI-powered triage systems"], "angle": "Patient outcomes and safety implications", "sources": ["Reuters", "STAT News"]},
+    {"topic": "Electric Vehicle Market Shift", "developments": ["Tesla cuts prices by 20% across all models", "BYD overtakes Toyota in global sales for first time"], "angle": "Impact on traditional automakers and consumer adoption", "sources": ["Bloomberg", "Automotive News"]},
+    {"topic": "Cybersecurity Crisis in Banking", "developments": ["Three major banks hit by coordinated ransomware attack", "Federal Reserve issues emergency cybersecurity directive"], "angle": "Systemic risk to financial infrastructure", "sources": ["Financial Times", "WSJ"]},
+    {"topic": "Climate Tech Breakthrough", "developments": ["Startup achieves fusion energy net gain at commercial scale", "UN report shows renewable energy now cheaper than fossil fuels globally"], "angle": "Investment implications and timeline to deployment", "sources": ["Nature", "The Guardian"]},
+    {"topic": "Remote Work Revolution 2.0", "developments": ["Fortune 500 companies reverse return-to-office mandates", "New study shows remote workers 25% more productive"], "angle": "Corporate culture transformation and real estate impact", "sources": ["Harvard Business Review", "CNBC"]},
+    {"topic": "Space Commercialization", "developments": ["SpaceX launches first civilian space station module", "Asteroid mining company secures $2B in funding"], "angle": "The new space economy and regulatory challenges", "sources": ["Space.com", "TechCrunch"]},
+    {"topic": "Global Chip Shortage Resolution", "developments": ["TSMC opens new Arizona fab ahead of schedule", "Intel announces breakthrough in 2nm chip manufacturing"], "angle": "Supply chain resilience and geopolitical implications", "sources": ["Nikkei Asia", "Semiconductor Engineering"]},
+    {"topic": "Social Media Regulation", "developments": ["EU Digital Services Act enforcement begins with major fines", "US Senate passes bipartisan social media safety bill"], "angle": "How platforms are adapting and what it means for users", "sources": ["Politico", "The Verge"]},
+    {"topic": "Biotech IPO Boom", "developments": ["mRNA vaccine technology applied to cancer treatment shows 90% efficacy", "Three biotech startups achieve unicorn status in single week"], "angle": "Market dynamics and patient access to new treatments", "sources": ["BioPharma Dive", "STAT News"]},
+    {"topic": "Housing Market Disruption", "developments": ["3D-printed homes reach price parity with traditional construction", "Major cities adopt AI-driven zoning reform"], "angle": "Affordability crisis solutions and construction industry impact", "sources": ["Bloomberg", "Curbed"]},
+    {"topic": "Education AI Transformation", "developments": ["OpenAI partners with 50 universities for AI tutoring", "Students using AI assistants score 30% higher on standardized tests"], "angle": "Equity concerns and the future of human teachers", "sources": ["EdSurge", "NYT"]},
+    {"topic": "Quantum Computing Milestone", "developments": ["Google achieves quantum advantage in drug discovery simulation", "IBM launches first commercially available 1000-qubit processor"], "angle": "Industries most likely to be disrupted first", "sources": ["MIT Technology Review", "Wired"]},
+    {"topic": "Food Supply Chain Innovation", "developments": ["Lab-grown meat receives FDA approval for restaurant sales", "Vertical farming startup supplies 10% of NYC produce"], "angle": "Consumer acceptance and environmental impact", "sources": ["Food & Wine", "Fast Company"]},
+    {"topic": "Digital Currency Regulation", "developments": ["Central banks of G7 nations announce coordinated CBDC launch", "Cryptocurrency exchange collapses with $8B in customer funds missing"], "angle": "Trust, regulation, and the future of money", "sources": ["Financial Times", "CoinDesk"]},
+    {"topic": "Autonomous Vehicles Go Mainstream", "developments": ["Waymo expands driverless service to 15 US cities", "First fatal autonomous truck accident sparks regulatory debate"], "angle": "Safety data, liability questions, and job displacement", "sources": ["Reuters", "Ars Technica"]},
+]
+
+
+def generate_news_briefs(count: int = 5, context: Optional[str] = None) -> list[dict]:
+    """Generate simulated news brief items for Publisher boards."""
+    pool = list(NEWS_BRIEF_POOL)
+    random.shuffle(pool)
+    briefs = pool[:count]
+
+    items = []
+    for brief in briefs:
+        title = brief["topic"]
+        description = (
+            f"**Topic:** {brief['topic']}\n"
+            f"**Key Developments:**\n"
+        )
+        for dev in brief["developments"]:
+            description += f"- {dev}\n"
+        description += (
+            f"**Angle:** {brief['angle']}\n"
+            f"**Sources:** {', '.join(brief['sources'])}\n"
+        )
+        if context:
+            description += f"\n**Editorial context:** {context[:200]}"
+        items.append({
+            "title": title,
+            "description": description,
+            "acceptance_criteria": f"Angle: {brief['angle']}. Sources: {', '.join(brief['sources'])}.",
+        })
+    return items
+
+
 TEMPLATE_GENERATORS = {
+    "publisher": generate_news_briefs,
     "talent_acquisition": generate_candidates,
     "sales": generate_leads,
     "ciso": generate_incidents,

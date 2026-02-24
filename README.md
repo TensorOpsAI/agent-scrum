@@ -1,6 +1,6 @@
 # Agent Scrum
 
-A multi-agent simulation platform where AI agents self-organize to process work across different domains. Create boards for Software Development, Talent Acquisition, Sales, or Security Operations - each with its own domain-specific agents that collaborate in real-time on a Kanban board.
+A multi-agent simulation platform where AI agents self-organize to process work across different domains. Create boards for Publishing, Software Development, Talent Acquisition, Sales, or Security Operations - each with its own domain-specific agents that collaborate in real-time on a Kanban board.
 
 [![Agent Scrum Demo](https://img.youtube.com/vi/iztjBErDY18/maxresdefault.jpg)](https://www.youtube.com/watch?v=iztjBErDY18)
 
@@ -48,7 +48,16 @@ The graph loops: `router -> agent -> router -> agent -> ... -> end` (when no mor
 
 ### Agent Dispatch
 
-Each board template defines which agent handles which column transition. For example, the Software Development template:
+Each board template defines which agent handles which column transition. For example, the Publisher template (default):
+
+| When item reaches status | Agent dispatched | Action |
+|--------------------------|-----------------|--------|
+| `writing` | Journalist | Write article |
+| `editing` | Editor | Review article |
+| `creatives` | Creative Director | Create visuals |
+| `ready_to_publish` | Publisher | Publish content |
+
+Or the Software Development template:
 
 | When item reaches status | Agent dispatched | Action |
 |--------------------------|-----------------|--------|
@@ -180,10 +189,22 @@ Each board is created from a template that defines its columns, agents, and work
 
 | Template | Items | Agents |
 |----------|-------|--------|
+| **Publisher** (default) | Articles + Sections | News Curator, Journalist, Editor, Creative Director, Publisher, Editor-in-Chief |
 | **Software Development** | Stories + Tasks | Product Owner, Developer, Tech Lead, Code Reviewer, QA, Scrum Master |
 | **Talent Acquisition** | Candidates | Sourcing Specialist, Recruiter, Hiring Manager, Interview Coordinator, HR Coordinator |
 | **Sales** | Deals | Lead Generator, Account Executive, Sales Manager, Solutions Engineer, Contract Specialist |
 | **CISO** | Risks | Threat Analyst, Security Engineer, Compliance Officer, Incident Responder, Risk Manager |
+
+### Publisher (Default)
+Click "Generate Articles" to auto-generate news briefs, then start the swarm:
+1. **News Curator** scans news sources, selects newsworthy items, and creates articles
+2. **Journalist** writes articles from curated news items
+3. **Editor** reviews articles for quality, accuracy, and tone
+4. **Creative Director** selects or generates visuals and thumbnails
+5. **Publisher** formats content, optimizes SEO, and publishes
+6. **Editor-in-Chief** oversees the pipeline and assigns stories
+
+Pipeline: Inbox → Writing → Editing → Creatives → Ready to Publish → Published
 
 ### Software Development
 Submit a PRD and watch agents build it:
@@ -272,15 +293,30 @@ Submit a risk and watch the response:
 | Real-time | WebSocket |
 | AI | Google Gemini API (or simulation mode) |
 
-## Commands
+## Running
 
 ```bash
-make install      # Install Python + Node dependencies
-make dev          # Start backend + frontend
-make test         # Run 80 backend tests
-make docker-up    # Start with Docker
-make mcp          # Start MCP server for external tools
-make reset        # Reset database
+# First time setup
+make install          # Install Python + Node dependencies
+
+# Start the app
+make dev              # Start backend (port 8000) + frontend (port 5173)
+
+# Open http://localhost:5173
+
+# Other commands
+make test             # Run backend tests
+make docker-up        # Start with Docker
+make mcp              # Start MCP server for external tools
+make reset            # Delete database and re-seed fresh
+make backend          # Start backend only
+make frontend         # Start frontend only
+```
+
+To switch the default board template, delete the database and restart:
+
+```bash
+make reset && make dev
 ```
 
 ## Configuration
@@ -313,7 +349,7 @@ agent-scrum/
 │   │   │   ├── swarm/graph.py        # LangGraph StateGraph (router + agent nodes)
 │   │   │   ├── swarm/state.py        # Swarm state schema
 │   │   │   ├── tools/db_tools.py     # LangChain tools for DB operations
-│   │   │   ├── tools/registry.py     # Tool basket (HR, Sales, InfoSec, Dev)
+│   │   │   ├── tools/registry.py     # Tool basket (Publishing, HR, Sales, InfoSec, Dev)
 │   │   │   └── executor.py           # Agent execution with capacity limits
 │   │   ├── a2a/
 │   │   │   ├── protocol.py           # JSON-RPC 2.0 handler (tasks/send, get, cancel)

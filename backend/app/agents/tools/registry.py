@@ -251,10 +251,89 @@ BUILTIN_TOOLS: dict[str, ToolDefinition] = {
         "capabilities": ["log_incident", "track_response", "generate_postmortem"],
         "is_builtin": True,
     },
+
+    # Publishing tools
+    "rss_reader": {
+        "name": "RSS Reader",
+        "description": "Scans RSS feeds and news sources for trending stories and topics",
+        "category": "publishing",
+        "capabilities": ["scan_feeds", "extract_headlines", "detect_trends"],
+        "is_builtin": True,
+    },
+    "trend_analyzer": {
+        "name": "Trend Analyzer",
+        "description": "Analyzes trending topics across social media and news outlets",
+        "category": "publishing",
+        "capabilities": ["analyze_trends", "score_newsworthiness", "identify_angles"],
+        "is_builtin": True,
+    },
+    "article_writer": {
+        "name": "Article Writer",
+        "description": "Drafts articles from news briefs with proper structure and tone",
+        "category": "publishing",
+        "capabilities": ["draft_article", "structure_content", "adapt_tone"],
+        "is_builtin": True,
+    },
+    "fact_checker": {
+        "name": "Fact Checker",
+        "description": "Verifies claims, sources, and data points in articles",
+        "category": "publishing",
+        "capabilities": ["verify_claims", "check_sources", "flag_inaccuracies"],
+        "is_builtin": True,
+    },
+    "grammar_checker": {
+        "name": "Grammar Checker",
+        "description": "Checks articles for grammar, spelling, and style consistency",
+        "category": "publishing",
+        "capabilities": ["check_grammar", "fix_spelling", "enforce_style_guide"],
+        "is_builtin": True,
+    },
+    "plagiarism_detector": {
+        "name": "Plagiarism Detector",
+        "description": "Detects potential plagiarism and unattributed content",
+        "category": "publishing",
+        "capabilities": ["scan_plagiarism", "check_originality", "suggest_citations"],
+        "is_builtin": True,
+    },
+    "image_generator": {
+        "name": "Image Generator",
+        "description": "Generates or selects images, thumbnails, and hero visuals for articles",
+        "category": "publishing",
+        "capabilities": ["generate_image", "create_thumbnail", "suggest_visuals"],
+        "is_builtin": True,
+    },
+    "asset_library": {
+        "name": "Asset Library",
+        "description": "Manages a library of reusable media assets and stock images",
+        "category": "publishing",
+        "capabilities": ["search_assets", "tag_media", "manage_library"],
+        "is_builtin": True,
+    },
+    "cms_connector": {
+        "name": "CMS Connector",
+        "description": "Connects to content management systems for publishing and scheduling",
+        "category": "publishing",
+        "capabilities": ["publish_content", "schedule_post", "manage_categories"],
+        "is_builtin": True,
+    },
+    "seo_optimizer": {
+        "name": "SEO Optimizer",
+        "description": "Optimizes content for search engines with keywords, meta tags, and structure",
+        "category": "publishing",
+        "capabilities": ["optimize_seo", "suggest_keywords", "generate_meta_tags"],
+        "is_builtin": True,
+    },
+    "editorial_dashboard": {
+        "name": "Editorial Dashboard",
+        "description": "Provides an overview of the editorial pipeline and content calendar",
+        "category": "publishing",
+        "capabilities": ["view_pipeline", "manage_calendar", "assign_stories"],
+        "is_builtin": True,
+    },
 }
 
 # Default categories (custom tools can add more)
-DEFAULT_CATEGORIES = ["security", "code", "testing", "docs", "performance", "devops", "hr", "sales", "infosec"]
+DEFAULT_CATEGORIES = ["security", "code", "testing", "docs", "performance", "devops", "hr", "sales", "infosec", "publishing"]
 
 
 def get_builtin_tool(tool_id: str) -> ToolDefinition | None:

@@ -266,18 +266,18 @@ export function Layout() {
               <Settings className="w-5 h-5" />
             </button>
 
-            {automationEnabled && isExternalSource && (
+            {automationEnabled && (isExternalSource || currentBoard?.template_id === 'publisher') && (
               <button
                 onClick={handleSimulate}
                 disabled={isSimulating}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
                 <Sparkles className="w-5 h-5" />
-                {isSimulating ? 'Simulating...' : `Simulate ${itemNoun}s`}
+                {isSimulating ? 'Simulating...' : currentBoard?.template_id === 'publisher' ? `Generate ${itemNoun}s` : `Simulate ${itemNoun}s`}
               </button>
             )}
 
-            {automationEnabled ? (
+            {automationEnabled && currentBoard?.template_id !== 'publisher' ? (
               <button
                 onClick={() => setIsPRDModalOpen(true)}
                 className={clsx(
@@ -290,7 +290,7 @@ export function Layout() {
                 <Plus className="w-5 h-5" />
                 Submit {inputNoun}
               </button>
-            ) : (
+            ) : !automationEnabled ? (
               <button
                 onClick={handleAddItem}
                 disabled={isAdding}
@@ -299,7 +299,7 @@ export function Layout() {
                 <Plus className="w-5 h-5" />
                 {isAdding ? 'Adding...' : `Add ${itemNoun}`}
               </button>
-            )}
+            ) : null}
 
             {addError && (
               <div className="absolute top-full right-0 mt-2 flex items-center gap-2 px-3 py-2 bg-red-900/90 text-red-200 text-sm rounded-lg whitespace-nowrap">

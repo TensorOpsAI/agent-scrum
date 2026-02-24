@@ -136,6 +136,34 @@ class SimulatedAgent:
             response_messages.append(AIMessage(content=response_content))
             return {"messages": response_messages}
 
+        # News Curator: Parse news briefs and create articles (publisher intake agent)
+        if role == "news_curator":
+            msg_lower = last_message.lower().strip()
+            is_chat_message = (
+                last_message.strip().startswith("@") or
+                len(last_message) < 100 or
+                (len(last_message) < 300 and (
+                    msg_lower.endswith("?") or
+                    msg_lower.startswith("please ") or
+                    msg_lower.startswith("can you") or
+                    msg_lower.startswith("start ") or
+                    msg_lower.startswith("hey ") or
+                    msg_lower.startswith("hi ")
+                ))
+            )
+
+            if is_chat_message:
+                response_content = f"News Curator acknowledges: {last_message[:50]}... (This looks like a chat message, not a news brief. Submit a news brief through the input form to create articles.)"
+                response_messages.append(AIMessage(content=response_content))
+                return {"messages": response_messages}
+
+            logger.info(f"[SIMULATED:{self.agent_id}] Processing news brief, will create articles")
+            board_id = self._context.get("board_id")
+            articles_created = await self._parse_news_brief_and_create_articles(last_message, board_id=board_id)
+            response_content = f"Analyzed news brief and created {articles_created} articles for coverage."
+            response_messages.append(AIMessage(content=response_content))
+            return {"messages": response_messages}
+
         # Developer: Break down story OR write implementation notes for task
         if role == "developer":
             # Check for task implementation first (more specific)
@@ -461,6 +489,151 @@ class SimulatedAgent:
 
         logger.info(f"[SIMULATED:product_owner] Created {stories_created} stories total")
         return stories_created
+
+    async def _parse_news_brief_and_create_articles(self, brief_content: str, board_id: int = None) -> int:
+        """Parse a news brief and create articles for the publisher pipeline."""
+        import re
+
+        logger.info(f"[SIMULATED:news_curator] _parse_news_brief_and_create_articles called with {len(brief_content)} chars")
+
+        articles = []
+        lines = brief_content.split('\n')
+
+        # Strategy 1: Look for markdown headers as article topics
+        current_section = None
+        section_content = []
+
+        for line in lines:
+            header_match = re.match(r'^#{1,3}\s+(.+)$', line.strip())
+            if header_match:
+                if current_section and section_content:
+                    content = ' '.join(section_content).strip()
+                    if len(content) > 10:
+                        articles.append(f"{current_section}: {content[:150]}")
+                current_section = header_match.group(1).strip()
+                section_content = []
+            elif current_section and line.strip():
+                section_content.append(line.strip())
+
+        if current_section and section_content:
+            content = ' '.join(section_content).strip()
+            if len(content) > 10:
+                articles.append(f"{current_section}: {content[:150]}")
+
+        # Strategy 2: Look for bullet points as separate article ideas
+        if len(articles) < 2:
+            bullet_items = []
+            for line in lines:
+                line = line.strip()
+                bullet_match = re.match(r'^[-*•]\s+(.+)$', line)
+                if bullet_match:
+                    item_text = bullet_match.group(1).strip()
+                    if len(item_text) > 10:
+                        bullet_items.append(item_text)
+            if bullet_items:
+                articles = bullet_items
+
+        # Strategy 3: Look for numbered items
+        if len(articles) < 2:
+            numbered_items = []
+            for line in lines:
+                line = line.strip()
+                numbered_match = re.match(r'^(\d+)[.\)]\s+(.+)$', line)
+                if numbered_match:
+                    item_text = numbered_match.group(2).strip()
+                    if len(item_text) > 5:
+                        numbered_items.append(item_text)
+            if numbered_items:
+                articles = numbered_items
+
+        # Strategy 4: Split by paragraphs
+        if len(articles) < 2:
+            paragraphs = re.split(r'\n\s*\n', brief_content)
+            para_items = []
+            for para in paragraphs:
+                para = para.strip()
+                if 20 < len(para) < 500:
+                    para_items.append(para[:200])
+            if para_items:
+                articles = para_items
+
+        # Fallback
+        if not articles:
+            clean_content = brief_content.strip()[:200]
+            if clean_content:
+                articles = [clean_content]
+            else:
+                articles = ["Cover the developments from the news brief"]
+
+        # Deduplicate and limit
+        seen = set()
+        unique_articles = []
+        for a in articles:
+            a_lower = a.lower()[:50]
+            if a_lower not in seen:
+                seen.add(a_lower)
+                unique_articles.append(a)
+
+        articles = unique_articles[:15]
+
+        # Derive additional article angles if we have few
+        if len(articles) < 5 and len(articles) > 0:
+            derived = [
+                f"Analysis: Impact and implications of {articles[0][:60]}",
+                f"Opinion: What {articles[0][:60]} means for the industry",
+                f"Timeline: Key milestones leading to {articles[0][:60]}",
+                "Expert roundup: Industry leaders weigh in",
+                "What to watch: Upcoming developments to follow",
+            ]
+            for d in derived:
+                if len(articles) >= 8:
+                    break
+                d_lower = d.lower()[:50]
+                if d_lower not in seen:
+                    seen.add(d_lower)
+                    articles.append(d)
+
+        logger.info(f"[SIMULATED:news_curator] Extracted {len(articles)} article topics")
+
+        # Create a Topic (epic) to group these articles
+        epic_id = None
+        if board_id is not None:
+            try:
+                epic_title = articles[0][:80] if articles else brief_content[:80]
+                epic_result = await create_epic.ainvoke({
+                    "title": epic_title,
+                    "board_id": board_id,
+                    "description": f"Auto-created from news brief ({len(articles)} articles)",
+                })
+                epic_id = epic_result.get("id")
+                logger.info(f"[SIMULATED:news_curator] Created topic #{epic_id}: {epic_title[:50]}")
+            except Exception as e:
+                logger.error(f"[SIMULATED:news_curator] Error creating topic: {e}", exc_info=True)
+
+        articles_created = 0
+        for i, article_topic in enumerate(articles, 1):
+            try:
+                title = article_topic[:100] if len(article_topic) <= 100 else f"{article_topic[:97]}..."
+                logger.info(f"[SIMULATED:news_curator] Creating article {i}: {title[:60]}...")
+                invoke_args = {
+                    "title": title,
+                    "description": f"[From News Brief] {article_topic}",
+                    "acceptance_criteria": "- Article is factually accurate\n- Sources are cited\n- Tone matches editorial guidelines\n- Visuals are selected",
+                    "priority": i,
+                    "prd_content": brief_content[:500],
+                }
+                if board_id is not None:
+                    invoke_args["board_id"] = board_id
+                if epic_id is not None:
+                    invoke_args["epic_id"] = epic_id
+                result = await create_story.ainvoke(invoke_args)
+                logger.info(f"[SIMULATED:news_curator] Article created: {result}")
+                articles_created += 1
+            except Exception as e:
+                logger.error(f"[SIMULATED:news_curator] Error creating article: {e}", exc_info=True)
+
+        logger.info(f"[SIMULATED:news_curator] Created {articles_created} articles total")
+        return articles_created
 
     async def _breakdown_story(self, story_id: int):
         """Break down a story into tasks."""
@@ -887,6 +1060,11 @@ This task involves implementing the required functionality as specified.
     def _get_domain_sub_items(self, template_id: str, role: str, action: str) -> list[tuple[str, str]]:
         """Get domain-specific sub-items to create for a story."""
         sub_items_map = {
+            "publisher": [
+                ("Draft introduction and hook", "Write an engaging opening paragraph that captures reader attention"),
+                ("Research and fact-check key claims", "Verify all facts, statistics, and quotes cited in the article"),
+                ("Write body sections with supporting evidence", "Develop the main content sections with data and expert perspectives"),
+            ],
             "talent_acquisition": [
                 ("Review resume and qualifications", "Check candidate's experience and skills against job requirements"),
                 ("Verify references", "Contact provided references for background verification"),
@@ -1059,6 +1237,54 @@ This task involves implementing the required functionality as specified.
                 ]
                 return False, random.choice(reasons)
             return True, "Deal approved"
+
+        # --- Publisher ---
+        if action == "review_article":
+            base_rate = 0.80
+            if any(w in item_lower for w in ["unverified", "rumor", "alleged", "anonymous source"]):
+                base_rate -= 0.20
+            if any(w in item_lower for w in ["exclusive", "confirmed", "official statement"]):
+                base_rate += 0.10
+            base_rate = max(0.20, min(base_rate, 0.95))
+            if random.random() > base_rate:
+                reasons = [
+                    "Article tone inconsistent with editorial guidelines",
+                    "Unverified claims need source confirmation",
+                    "Lead paragraph doesn't effectively capture the story angle",
+                    "Article structure needs rework for readability",
+                ]
+                return False, random.choice(reasons)
+            return True, "Article meets editorial standards"
+
+        if action == "create_visuals":
+            if random.random() > 0.85:
+                reasons = [
+                    "Proposed visuals don't match article tone",
+                    "Image licensing issues with selected assets",
+                    "Thumbnail doesn't meet brand guidelines",
+                ]
+                return False, random.choice(reasons)
+            return True, "Visuals approved"
+
+        if action == "publish":
+            if random.random() > 0.90:
+                reasons = [
+                    "SEO analysis shows poor keyword coverage",
+                    "Publication schedule conflict detected",
+                    "Final review caught formatting issues",
+                ]
+                return False, random.choice(reasons)
+            return True, "Ready for publication"
+
+        if action in ("draft_section", "review_section", "attach_media"):
+            if random.random() > 0.85:
+                reasons = [
+                    "Section needs additional supporting evidence",
+                    "Writing quality below editorial standards",
+                    "Media assets don't complement the content",
+                ]
+                return False, random.choice(reasons)
+            return True, "Section approved"
 
         # --- CISO ---
         if action in ("audit", "compliance_review"):
@@ -1501,6 +1727,29 @@ def create_scrum_master_agent():
 # Maps (template_id, role, action) -> simulated response text
 
 DOMAIN_SIMULATIONS = {
+    "publisher": {
+        "news_curator": {
+            "curate": "Scanned 50+ news sources and trending topics. Identified 8 newsworthy items with high reader interest potential.",
+        },
+        "journalist": {
+            "write_article": "Drafted article with headline, lede, body, and quotes. Word count: 1,200. Submitted for editorial review.",
+            "draft_section": "Drafted section with supporting details, data points, and source attributions. Ready for editor review.",
+        },
+        "editor": {
+            "review_article": "Editorial review complete. Checked grammar, fact accuracy, tone consistency, and AP style compliance. Article approved.",
+            "review_section": "Section reviewed for clarity, accuracy, and style. Edits applied. Moving to creative assets.",
+        },
+        "creative_director": {
+            "create_visuals": "Selected hero image, created thumbnail, and prepared social media graphics. All assets meet brand guidelines.",
+            "attach_media": "Attached relevant media assets to the section. Images optimized for web delivery.",
+        },
+        "publisher_agent": {
+            "publish": "Content formatted for CMS. SEO meta tags added. Scheduled for publication. Social media posts queued.",
+        },
+        "editor_in_chief": {
+            "assign": "Reviewed incoming stories and assigned to journalists based on beat expertise and availability.",
+        },
+    },
     "software_dev": {
         "product_owner": {
             "parse_prd": "Analyzed PRD and created user stories with acceptance criteria.",
@@ -1594,6 +1843,7 @@ DOMAIN_SIMULATIONS = {
 # For task handlers: where rejected tasks go
 
 REJECTION_STATUSES = {
+    "publisher": {"story": "inbox", "task": "pending"},
     "talent_acquisition": {"story": "sourced", "task": None},
     "sales": {"story": "closed_lost", "task": None},
     "ciso": {"story": "mitigating", "task": "identified"},
@@ -1601,6 +1851,37 @@ REJECTION_STATUSES = {
 
 # Rejection-specific response texts keyed by (template_id, role, action)
 DOMAIN_REJECTIONS = {
+    "publisher": {
+        "editor": {
+            "review_article": [
+                "Article needs significant revision. Tone inconsistent with editorial guidelines. Sending back to writing.",
+                "Fact-check flagged unverified claims. Sources need to be confirmed before proceeding.",
+                "Article structure needs rework. Lead paragraph doesn't capture the story angle. Back to writing.",
+            ],
+            "review_section": [
+                "Section lacks supporting evidence. Additional sources needed.",
+                "Writing quality below editorial standards. Needs revision.",
+            ],
+        },
+        "creative_director": {
+            "create_visuals": [
+                "Proposed visuals don't match article tone. Need fresh creative direction. Back to editing.",
+                "Image licensing issues detected. Cannot use selected assets. Needs new visual approach.",
+                "Thumbnail doesn't meet brand guidelines. Reworking creative assets.",
+            ],
+            "attach_media": [
+                "Media assets don't complement the section content. Needs different visuals.",
+                "Image resolution too low for publication standards. Needs replacement.",
+            ],
+        },
+        "publisher_agent": {
+            "publish": [
+                "SEO analysis shows poor keyword coverage. Content needs optimization before publishing.",
+                "Publication schedule conflict. Slot unavailable. Rescheduling needed.",
+                "Final review caught formatting issues. Sending back for fixes before going live.",
+            ],
+        },
+    },
     "talent_acquisition": {
         "recruiter": {
             "screen_resume": [

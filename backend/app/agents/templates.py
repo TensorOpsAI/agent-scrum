@@ -221,6 +221,217 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
         },
     },
 
+    "news_curator": {
+        "name": "News Curator",
+        "description": "Scans news sources, trending topics, and RSS feeds to identify newsworthy items for coverage. Selects stories with high reader interest potential.",
+        "default_tools": ["rss_reader", "trend_analyzer"],
+        "skills": [
+            {
+                "id": "scan_sources",
+                "name": "Scan News Sources",
+                "description": "Monitor RSS feeds, news aggregators, and social media for breaking stories and trending topics",
+                "tags": ["news", "rss", "trending", "sources"],
+                "examples": ["Scan for breaking news", "What's trending today?", "Find stories about AI"],
+            },
+            {
+                "id": "evaluate_newsworthiness",
+                "name": "Evaluate Newsworthiness",
+                "description": "Assess whether a topic has enough reader interest, timeliness, and impact to warrant coverage",
+                "tags": ["evaluation", "editorial", "priority"],
+                "examples": ["Is this story worth covering?", "Rate the newsworthiness of this topic"],
+            },
+            {
+                "id": "create_brief",
+                "name": "Create News Brief",
+                "description": "Compile a structured news brief with key facts, sources, and suggested angles for journalists",
+                "tags": ["brief", "assignment", "angles"],
+                "examples": ["Create a brief for this story", "Summarize the key facts"],
+            },
+        ],
+        "capabilities": {
+            "streaming": False,
+            "push_notifications": True,
+            "state_transition_history": True,
+        },
+    },
+
+    "journalist": {
+        "name": "Journalist",
+        "description": "Writes articles from curated news items, conducting research, structuring content, and producing publishable pieces that meet editorial standards.",
+        "default_tools": ["article_writer", "fact_checker"],
+        "skills": [
+            {
+                "id": "write_article",
+                "name": "Write Article",
+                "description": "Draft a complete article with headline, lede, body, and conclusion from a news brief or topic",
+                "tags": ["writing", "article", "draft"],
+                "examples": ["Write an article about this topic", "Draft a piece on the latest developments"],
+            },
+            {
+                "id": "research_topic",
+                "name": "Research Topic",
+                "description": "Gather background information, statistics, and expert opinions to support an article",
+                "tags": ["research", "facts", "background"],
+                "examples": ["Research background on this story", "Find supporting data for the article"],
+            },
+            {
+                "id": "draft_section",
+                "name": "Draft Section",
+                "description": "Write a specific section of an article with supporting details and source attributions",
+                "tags": ["section", "draft", "writing"],
+                "examples": ["Write the introduction section", "Draft the analysis section"],
+            },
+        ],
+        "capabilities": {
+            "streaming": False,
+            "push_notifications": False,
+            "state_transition_history": True,
+        },
+    },
+
+    "editor": {
+        "name": "Editor",
+        "description": "Reviews articles for quality, accuracy, tone, and adherence to editorial standards. Ensures content is publication-ready.",
+        "default_tools": ["grammar_checker", "plagiarism_detector"],
+        "skills": [
+            {
+                "id": "review_article",
+                "name": "Review Article",
+                "description": "Perform a comprehensive editorial review checking grammar, facts, tone, and structure",
+                "tags": ["review", "editing", "quality"],
+                "examples": ["Review this article for publication", "Edit the draft for quality"],
+            },
+            {
+                "id": "fact_check",
+                "name": "Fact Check",
+                "description": "Verify all claims, statistics, and quotes in the article against reliable sources",
+                "tags": ["facts", "verification", "accuracy"],
+                "examples": ["Fact-check this article", "Verify the claims in paragraph 3"],
+            },
+            {
+                "id": "style_review",
+                "name": "Style Review",
+                "description": "Ensure the article follows AP style, brand voice, and editorial guidelines",
+                "tags": ["style", "guidelines", "tone"],
+                "examples": ["Check style guide compliance", "Review tone consistency"],
+            },
+        ],
+        "capabilities": {
+            "streaming": False,
+            "push_notifications": False,
+            "state_transition_history": True,
+        },
+    },
+
+    "creative_director": {
+        "name": "Creative Director",
+        "description": "Selects or generates visuals, thumbnails, and creatives for articles. Ensures visual assets match content tone and brand guidelines.",
+        "default_tools": ["image_generator", "asset_library"],
+        "skills": [
+            {
+                "id": "create_visuals",
+                "name": "Create Visuals",
+                "description": "Select or generate hero images, thumbnails, and infographics that complement article content",
+                "tags": ["visuals", "images", "creative"],
+                "examples": ["Create visuals for this article", "Generate a hero image"],
+            },
+            {
+                "id": "brand_review",
+                "name": "Brand Review",
+                "description": "Ensure all visual assets meet brand guidelines for color, typography, and style",
+                "tags": ["brand", "guidelines", "consistency"],
+                "examples": ["Check brand compliance of images", "Review thumbnail against guidelines"],
+            },
+            {
+                "id": "social_assets",
+                "name": "Social Media Assets",
+                "description": "Create optimized visual assets for social media promotion of articles",
+                "tags": ["social", "promotion", "assets"],
+                "examples": ["Create social media graphics", "Design shareable images"],
+            },
+        ],
+        "capabilities": {
+            "streaming": False,
+            "push_notifications": False,
+            "state_transition_history": True,
+        },
+    },
+
+    "publisher_agent": {
+        "name": "Publisher",
+        "description": "Formats and publishes final content to CMS platforms, manages the publication schedule, and optimizes for SEO.",
+        "default_tools": ["cms_connector", "seo_optimizer"],
+        "skills": [
+            {
+                "id": "publish_content",
+                "name": "Publish Content",
+                "description": "Format and publish articles to the CMS with proper categories, tags, and metadata",
+                "tags": ["publish", "cms", "format"],
+                "examples": ["Publish this article", "Schedule for publication"],
+            },
+            {
+                "id": "seo_optimize",
+                "name": "SEO Optimize",
+                "description": "Optimize content for search engines with keywords, meta descriptions, and structured data",
+                "tags": ["seo", "keywords", "optimization"],
+                "examples": ["Optimize for SEO", "Add meta tags and keywords"],
+            },
+            {
+                "id": "schedule",
+                "name": "Schedule Publication",
+                "description": "Manage the editorial calendar and schedule content for optimal publishing times",
+                "tags": ["schedule", "calendar", "timing"],
+                "examples": ["Schedule for tomorrow morning", "Find the best time to publish"],
+            },
+        ],
+        "capabilities": {
+            "streaming": False,
+            "push_notifications": False,
+            "state_transition_history": True,
+        },
+    },
+
+    "editor_in_chief": {
+        "name": "Editor-in-Chief",
+        "description": "Oversees the editorial pipeline, assigns stories to journalists, manages priorities, and ensures consistent content quality across all publications.",
+        "default_tools": ["editorial_dashboard"],
+        "skills": [
+            {
+                "id": "assign_stories",
+                "name": "Assign Stories",
+                "description": "Review incoming news items and assign them to journalists based on beat expertise and workload",
+                "tags": ["assign", "workflow", "management"],
+                "examples": ["Assign this story to a journalist", "Who should cover this topic?"],
+            },
+            {
+                "id": "editorial_standup",
+                "name": "Editorial Standup",
+                "description": "Summarize the current state of the editorial pipeline: what's in progress, what's stuck, what's ready to publish",
+                "tags": ["standup", "summary", "status"],
+                "examples": ["Give me a pipeline summary", "What's the status of today's content?"],
+            },
+            {
+                "id": "manage_priorities",
+                "name": "Manage Priorities",
+                "description": "Reprioritize stories based on breaking news, reader interest, and editorial strategy",
+                "tags": ["priority", "strategy", "breaking"],
+                "examples": ["Reprioritize the content queue", "This story needs to be fast-tracked"],
+            },
+            {
+                "id": "quality_oversight",
+                "name": "Quality Oversight",
+                "description": "Review final content for editorial quality and brand alignment before major publications",
+                "tags": ["quality", "brand", "oversight"],
+                "examples": ["Final review before publishing", "Check quality of today's articles"],
+            },
+        ],
+        "capabilities": {
+            "streaming": False,
+            "push_notifications": True,
+            "state_transition_history": True,
+        },
+    },
+
     "scrum_master": {
         "name": "Scrum Master",
         "description": "Coordinates the team workflow, unblocks stuck tasks, and ensures smooth handoffs between agents. Monitors the board and chat for issues that need intervention.",

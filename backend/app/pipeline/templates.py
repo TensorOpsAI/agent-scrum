@@ -17,6 +17,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 PIPELINE_TEMPLATES = [
     {
+        "template_id": "publisher",
+        "name": "Publisher",
+        "columns": [
+            {"key": "inbox", "label": "Inbox", "color": "bg-gray-600", "position": 0},
+            {"key": "writing", "label": "Writing", "color": "bg-blue-600", "position": 1},
+            {"key": "editing", "label": "Editing", "color": "bg-purple-600", "position": 2},
+            {"key": "creatives", "label": "Creatives", "color": "bg-pink-600", "position": 3},
+            {"key": "ready_to_publish", "label": "Ready to Publish", "color": "bg-yellow-600", "position": 4},
+            {"key": "published", "label": "Published", "color": "bg-green-600", "position": 5},
+        ],
+        "agent_automation": True,
+        "item_noun": "Article",
+        "has_tasks": True,
+        "sub_item_noun": "Section",
+        "input_noun": "News Brief",
+        "epic_noun": "Topic",
+        "input_placeholder": "Paste your news brief or topic here...\n\nExample:\n# Topic: AI in Healthcare\n## Key Developments\n- FDA approves first AI diagnostic tool\n- Major hospital networks adopting AI triage\n## Angle\nFocus on patient outcomes and safety implications",
+        "sub_item_statuses": ["pending", "in_progress", "review", "done"],
+        "item_source": "internal",
+        "intake_agent": "news_curator",
+        "manager_role": "editor_in_chief",
+        "agents": [
+            {"role": "news_curator", "name": "News Curator", "description": "Scans news sources and trending topics, selects newsworthy items for coverage", "tools": ["rss_reader", "trend_analyzer"]},
+            {"role": "journalist", "name": "Journalist", "description": "Writes articles from curated news items, breaks them into publishable pieces", "tools": ["article_writer", "fact_checker"]},
+            {"role": "editor", "name": "Editor", "description": "Reviews articles for quality, accuracy, tone, and editorial standards", "tools": ["grammar_checker", "plagiarism_detector"]},
+            {"role": "creative_director", "name": "Creative Director", "description": "Selects or generates visuals, thumbnails, and creatives for articles", "tools": ["image_generator", "asset_library"]},
+            {"role": "publisher_agent", "name": "Publisher", "description": "Formats and publishes final content, manages publication schedule", "tools": ["cms_connector", "seo_optimizer"]},
+            {"role": "editor_in_chief", "name": "Editor-in-Chief", "description": "Oversees the editorial pipeline, assigns stories, manages priorities (manager)", "tools": ["editorial_dashboard"], "is_active": True},
+        ],
+    },
+    {
         "template_id": "software_dev",
         "name": "Software Development",
         "columns": [
@@ -146,6 +177,19 @@ PIPELINE_TEMPLATES = [
 # Maps column keys to (agent_role, action, next_status) for the swarm to dispatch.
 
 TEMPLATE_WORKFLOWS = {
+    "publisher": {
+        "story_handlers": {
+            "writing": ("journalist", "write_article", "editing"),
+            "editing": ("editor", "review_article", "creatives"),
+            "creatives": ("creative_director", "create_visuals", "ready_to_publish"),
+            "ready_to_publish": ("publisher_agent", "publish", "published"),
+        },
+        "task_handlers": {
+            "pending": ("journalist", "draft_section", "in_progress"),
+            "in_progress": ("editor", "review_section", "review"),
+            "review": ("creative_director", "attach_media", "done"),
+        },
+    },
     "software_dev": {
         "story_handlers": {
             "ready_for_breakdown": ("developer", "breakdown", "in_breakdown"),

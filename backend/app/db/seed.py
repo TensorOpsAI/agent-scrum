@@ -19,7 +19,7 @@ def get_template_agents(template_id: str) -> list[dict]:
 
 
 # Keep DEFAULT_AGENTS for backward-compat imports (used by conftest assertions)
-DEFAULT_AGENTS = get_template_agents("software_dev")
+DEFAULT_AGENTS = get_template_agents("publisher")
 
 
 async def seed_agents_for_board(db: AsyncSession, board: PipelineConfig) -> int:
@@ -90,7 +90,7 @@ async def seed_default_agents(db: AsyncSession) -> int:
 
     board = None
     if board_count == 0:
-        template = get_template_by_id("software_dev")
+        template = get_template_by_id("publisher")
         board = PipelineConfig(
             template_id=template["template_id"],
             name=template["name"],
@@ -98,9 +98,9 @@ async def seed_default_agents(db: AsyncSession) -> int:
             agent_automation=template["agent_automation"],
             item_noun=template["item_noun"],
             has_tasks=template["has_tasks"],
-            sub_item_noun=template.get("sub_item_noun", "Task"),
-            input_noun=template.get("input_noun", "PRD"),
-            epic_noun=template.get("epic_noun", "Epic"),
+            sub_item_noun=template.get("sub_item_noun", "Section"),
+            input_noun=template.get("input_noun", "News Brief"),
+            epic_noun=template.get("epic_noun", "Topic"),
             input_placeholder=template.get("input_placeholder"),
             sub_item_statuses=template.get("sub_item_statuses"),
             item_source=template.get("item_source", "internal"),
@@ -108,7 +108,7 @@ async def seed_default_agents(db: AsyncSession) -> int:
         db.add(board)
         await db.commit()
         await db.refresh(board)
-        print("[Seed] Created default Software Development board")
+        print("[Seed] Created default Publisher board")
     else:
         # Get the first board
         result = await db.execute(
