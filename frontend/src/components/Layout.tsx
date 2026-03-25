@@ -12,10 +12,13 @@ import { ChatPanel } from './chat/ChatPanel';
 import { StoryDetail } from './story/StoryDetail';
 import { useStoryStore } from '../store/storyStore';
 import { usePipelineStore } from '../store/pipelineStore';
+import { useUIStore } from '../store/uiStore';
 import { storyApi, simulateApi, settingsApi } from '../api/client';
 
 export function Layout() {
-  const [isPRDModalOpen, setIsPRDModalOpen] = useState(false);
+  const isPRDModalOpen = useUIStore((s) => s.isPRDModalOpen);
+  const openPRDModal = useUIStore((s) => s.openPRDModal);
+  const closePRDModal = useUIStore((s) => s.closePRDModal);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
   const [isAgentManagerOpen, setIsAgentManagerOpen] = useState(false);
@@ -132,6 +135,8 @@ export function Layout() {
     if (newCurrentId) fetchStories(newCurrentId);
   };
 
+  const setOnGenerate = useUIStore((s) => s.setOnGenerate);
+
   const handleSimulate = async () => {
     if (!currentBoardId) return;
     setIsSimulating(true);
@@ -146,6 +151,12 @@ export function Layout() {
       setIsSimulating(false);
     }
   };
+
+  // Expose simulate handler so empty board state can trigger it
+  useEffect(() => {
+    setOnGenerate(() => handleSimulate);
+    return () => setOnGenerate(null);
+  }, [currentBoardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
@@ -279,7 +290,7 @@ export function Layout() {
 
             {automationEnabled && currentBoard?.template_id !== 'publisher' ? (
               <button
-                onClick={() => setIsPRDModalOpen(true)}
+                onClick={() => openPRDModal()}
                 className={clsx(
                   'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
                   isExternalSource
@@ -357,7 +368,7 @@ export function Layout() {
       {/* PRD Modal */}
       <PRDInputModal
         isOpen={isPRDModalOpen}
-        onClose={() => setIsPRDModalOpen(false)}
+        onClose={closePRDModal}
       />
 
       {/* Settings Modal */}
