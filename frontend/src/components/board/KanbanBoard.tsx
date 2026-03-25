@@ -4,6 +4,7 @@ import { FileText, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
 import { useStoryStore } from '../../store/storyStore';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useUIStore } from '../../store/uiStore';
+import { simulateApi } from '../../api/client';
 import { StoryCard } from './StoryCard';
 import type { Story, PipelineColumn } from '../../types';
 
@@ -200,7 +201,7 @@ export function KanbanBoard() {
   const setSelectedEpic = usePipelineStore((s) => s.setSelectedEpic);
   const fetchEpics = usePipelineStore((s) => s.fetchEpics);
   const openPRDModal = useUIStore((s) => s.openPRDModal);
-  const onGenerate = useUIStore((s) => s.onGenerate);
+  const { fetchStories } = useStoryStore();
 
   const epicNoun = currentBoard?.epic_noun ?? 'Epic';
   const inputNoun = currentBoard?.input_noun ?? 'PRD';
@@ -255,7 +256,11 @@ export function KanbanBoard() {
         templateId={templateId}
         onSubmit={openPRDModal}
         isPublisher={isPublisher}
-        onGenerate={onGenerate ?? undefined}
+        onGenerate={async () => {
+          if (!currentBoard?.id) return;
+          await simulateApi.generate(currentBoard.id);
+          fetchStories(currentBoard.id);
+        }}
       />
     );
   }

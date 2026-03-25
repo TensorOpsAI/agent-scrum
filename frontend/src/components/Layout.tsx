@@ -135,8 +135,6 @@ export function Layout() {
     if (newCurrentId) fetchStories(newCurrentId);
   };
 
-  const setOnGenerate = useUIStore((s) => s.setOnGenerate);
-
   const handleSimulate = async () => {
     if (!currentBoardId) return;
     setIsSimulating(true);
@@ -151,12 +149,6 @@ export function Layout() {
       setIsSimulating(false);
     }
   };
-
-  // Expose simulate handler so empty board state can trigger it
-  useEffect(() => {
-    setOnGenerate(() => handleSimulate);
-    return () => setOnGenerate(null);
-  }, [currentBoardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
