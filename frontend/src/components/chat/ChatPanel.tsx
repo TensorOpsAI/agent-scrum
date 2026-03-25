@@ -103,6 +103,7 @@ export function ChatPanel() {
   const [targetAgent, setTargetAgent] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { lastMessage } = useWebSocket();
@@ -136,9 +137,15 @@ export function ChatPanel() {
     }
   }, [lastMessage]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll only when user is already near the bottom of the chat
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 120;
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [messages]);
 
   const handleSendMessage = useCallback(async () => {
@@ -208,7 +215,7 @@ export function ChatPanel() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
