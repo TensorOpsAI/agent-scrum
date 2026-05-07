@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
-import { clsx } from 'clsx';
-import { FileText, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { FileText, Sparkles, Zap, CheckCircle2, Play, RotateCcw, X } from 'lucide-react';
 import { useStoryStore } from '../../store/storyStore';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useUIStore } from '../../store/uiStore';
+import { useStoryActivity } from '../../hooks/useStoryActivity';
+import { useDemoReplay } from '../../hooks/useDemoReplay';
 import { simulateApi } from '../../api/client';
 import { StoryCard } from './StoryCard';
 import type { Story, PipelineColumn } from '../../types';
@@ -14,45 +16,43 @@ interface KanbanColumnProps {
   color: string;
   stories: Story[];
   selectedStoryId: number | null;
+  activeIds: Set<number>;
   onSelectStory: (id: number) => void;
 }
 
 function KanbanColumn({
-  columnKey,
-  label,
-  color,
-  stories,
-  selectedStoryId,
-  onSelectStory,
+  columnKey, label, color, stories, selectedStoryId, activeIds, onSelectStory,
 }: KanbanColumnProps) {
   return (
-    <div className="flex flex-col min-w-[280px] w-[280px] bg-gray-850 rounded-lg h-full" data-status={columnKey}>
-      <div
-        className={clsx(
-          'px-4 py-3 rounded-t-lg flex items-center justify-between flex-shrink-0',
-          color
-        )}
-      >
-        <h2 className="font-semibold text-white text-sm">
-          {label}
-        </h2>
-        <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-medium">
-          {stories.length}
-        </span>
+    <div
+      className="flex flex-col min-w-[300px] w-[300px] surface-muted h-full"
+      data-status={columnKey}
+    >
+      <div className="px-3.5 py-3 flex items-center justify-between flex-shrink-0 border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <span className={cn('status-dot', color)} />
+          <h2 className="font-medium text-foreground text-[13px] tracking-tight">
+            {label}
+          </h2>
+          <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+            {stories.length}
+          </span>
+        </div>
       </div>
 
-      <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+      <div className="flex-1 p-2.5 space-y-2 overflow-y-auto">
         {stories.map((story) => (
           <StoryCard
             key={story.id}
             story={story}
             isSelected={selectedStoryId === story.id}
+            isActive={activeIds.has(story.id)}
             onClick={() => onSelectStory(story.id)}
           />
         ))}
 
         {stories.length === 0 && (
-          <div className="text-center py-8 text-gray-500 text-sm">
+          <div className="text-center py-10 text-xs text-muted-foreground/60 italic">
             No items
           </div>
         )}
@@ -61,7 +61,6 @@ function KanbanColumn({
   );
 }
 
-// Descriptions of what happens after submission, per template
 const WORKFLOW_STEPS: Record<string, { icon: React.ReactNode; steps: string[] }> = {
   software_dev: {
     icon: <FileText className="w-6 h-6" />,
@@ -106,12 +105,7 @@ const WORKFLOW_STEPS: Record<string, { icon: React.ReactNode; steps: string[] }>
 };
 
 function EmptyBoardState({
-  inputNoun,
-  itemNoun,
-  templateId,
-  onSubmit,
-  isPublisher,
-  onGenerate,
+  inputNoun, itemNoun, templateId, onSubmit, isPublisher, onGenerate, onReplay, hasPlayed,
 }: {
   inputNoun: string;
   itemNoun: string;
@@ -119,70 +113,79 @@ function EmptyBoardState({
   onSubmit: () => void;
   isPublisher: boolean;
   onGenerate?: () => void;
+  onReplay?: () => void;
+  hasPlayed?: boolean;
 }) {
   const workflow = WORKFLOW_STEPS[templateId] || WORKFLOW_STEPS.software_dev;
+  const article = /^[aeiou]/i.test(inputNoun) ? 'an' : 'a';
 
   return (
     <div className="flex items-center justify-center h-full px-8">
-      <div className="max-w-lg w-full text-center">
-        {/* Hero icon */}
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-400 mb-6">
-          <Zap className="w-8 h-8" />
+      <div className="max-w-lg w-full text-center animate-fade-in">
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-6">
+          <Zap className="w-7 h-7" />
         </div>
 
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
           Get started in seconds
         </h2>
-        <p className="text-gray-400 mb-8 text-base leading-relaxed">
-          Submit {inputNoun === 'PRD' ? 'a' : (/^[aeiou]/i.test(inputNoun) ? 'an' : 'a')}{' '}
-          <span className="text-gray-200 font-medium">{inputNoun}</span> and watch AI agents
+        <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
+          Submit {inputNoun === 'PRD' ? 'a' : article}{' '}
+          <span className="text-foreground font-medium">{inputNoun}</span> and watch AI agents
           turn it into actionable {itemNoun.toLowerCase()}s on this board.
         </p>
 
-        {/* CTA buttons */}
-        <div className="flex flex-col items-center gap-3 mb-10">
+        <div className="flex flex-col items-center gap-3 mb-8">
           {isPublisher ? (
             <button
               onClick={onGenerate}
-              className="flex items-center gap-2.5 px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-base transition-colors shadow-lg shadow-purple-600/20"
+              className="inline-flex items-center gap-2 h-11 px-6 rounded-lg font-medium bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02]"
             >
-              <Sparkles className="w-5 h-5" />
+              <Sparkles className="w-4 h-4" />
               Generate {itemNoun}s
             </button>
           ) : (
             <button
               onClick={onSubmit}
-              className="flex items-center gap-2.5 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base transition-colors shadow-lg shadow-blue-600/20"
+              className="inline-flex items-center gap-2 h-11 px-6 rounded-lg font-medium bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02]"
             >
-              <FileText className="w-5 h-5" />
+              <FileText className="w-4 h-4" />
               Submit {inputNoun}
             </button>
           )}
           {!isPublisher && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-muted-foreground/70">
               Don't have one? The modal includes an example you can try instantly.
             </span>
           )}
+          {onReplay && hasPlayed && (
+            <button
+              onClick={onReplay}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Replay 30-second demo
+            </button>
+          )}
         </div>
 
-        {/* How it works */}
-        <div className="bg-gray-800/60 rounded-xl border border-gray-700/50 p-5 text-left">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+        <div className="surface p-5 text-left">
+          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-4">
             How it works
           </h3>
           <div className="space-y-3">
             {workflow.steps.map((step, i) => (
               <div key={i} className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-xs font-bold mt-0.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-[11px] font-semibold mt-0.5">
                   {i + 1}
                 </div>
-                <p className="text-sm text-gray-300 leading-relaxed">{step}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-700/50">
-            <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
-            <p className="text-xs text-gray-400">
+          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/60">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+            <p className="text-xs text-muted-foreground">
               Everything happens automatically — just watch your board fill up.
             </p>
           </div>
@@ -193,8 +196,7 @@ function EmptyBoardState({
 }
 
 export function KanbanBoard() {
-  const { stories, selectedStoryId, setSelectedStory, isLoading } =
-    useStoryStore();
+  const { stories, selectedStoryId, setSelectedStory, isLoading } = useStoryStore();
   const currentBoard = usePipelineStore((s) => s.currentBoard);
   const epics = usePipelineStore((s) => s.epics);
   const selectedEpicId = usePipelineStore((s) => s.selectedEpicId);
@@ -202,6 +204,7 @@ export function KanbanBoard() {
   const fetchEpics = usePipelineStore((s) => s.fetchEpics);
   const openPRDModal = useUIStore((s) => s.openPRDModal);
   const { fetchStories } = useStoryStore();
+  const activeIds = useStoryActivity();
 
   const epicNoun = currentBoard?.epic_noun ?? 'Epic';
   const inputNoun = currentBoard?.input_noun ?? 'PRD';
@@ -210,10 +213,10 @@ export function KanbanBoard() {
   const automationEnabled = currentBoard?.agent_automation === true;
   const isPublisher = templateId === 'publisher';
 
+  const replay = useDemoReplay(currentBoard?.id ?? null, templateId);
+
   useEffect(() => {
-    if (currentBoard?.id) {
-      fetchEpics(currentBoard.id);
-    }
+    if (currentBoard?.id) fetchEpics(currentBoard.id);
   }, [currentBoard?.id, fetchEpics]);
 
   const columns: PipelineColumn[] = currentBoard?.columns ?? [];
@@ -233,20 +236,19 @@ export function KanbanBoard() {
   if (isLoading && stories.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <div className="animate-spin rounded-full h-7 w-7 border-2 border-border border-t-primary" />
       </div>
     );
   }
 
   if (columns.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
         No board selected
       </div>
     );
   }
 
-  // Show guided empty state when board has no stories and automation is on
   const boardIsEmpty = stories.length === 0;
   if (boardIsEmpty && automationEnabled) {
     return (
@@ -261,41 +263,81 @@ export function KanbanBoard() {
           await simulateApi.generate(currentBoard.id);
           fetchStories(currentBoard.id);
         }}
+        onReplay={replay.play}
+        hasPlayed={replay.hasPlayed}
       />
     );
   }
 
   return (
     <div className="flex flex-col h-full">
+      {replay.isReplaying && (
+        <div className="mx-4 mb-3 flex items-center gap-3 px-3 py-2 rounded-md border border-primary/30 bg-primary/8 animate-fade-in">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-foreground">Demo replay running</div>
+            <div className="text-[10px] text-muted-foreground">
+              {replay.headline ?? 'Watching a recorded run of the swarm'}
+            </div>
+          </div>
+          <button
+            onClick={replay.skip}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border hover:bg-accent text-foreground transition-colors"
+          >
+            <X className="w-3 h-3" />
+            Skip
+          </button>
+        </div>
+      )}
+      {!replay.isReplaying && replay.hasPlayed && stories.some((s) => s.id < 0) && (
+        <div className="mx-4 mb-3 flex items-center gap-3 px-3 py-2 rounded-md border border-border bg-card/40 animate-fade-in">
+          <Play className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-foreground">This was a demo replay</div>
+            <div className="text-[10px] text-muted-foreground">
+              Add your Gemini API key in Settings to run your own briefs through real agents
+            </div>
+          </div>
+          <button
+            onClick={replay.play}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border hover:bg-accent text-foreground transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Replay
+          </button>
+        </div>
+      )}
       {epics.length > 0 && (
         <div className="px-4 pb-3 flex items-center gap-2">
-          <label className="text-sm text-gray-400">{epicNoun}:</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{epicNoun}</label>
           <select
-            className="bg-gray-800 text-sm text-gray-200 border border-gray-600 rounded px-2 py-1"
+            className="bg-card text-sm text-foreground border border-border rounded-md px-2.5 py-1 h-8 focus:outline-none focus:ring-2 focus:ring-ring"
             value={selectedEpicId ?? ''}
             onChange={(e) => setSelectedEpic(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">All {epicNoun}s</option>
             {epics.map((epic) => (
-              <option key={epic.id} value={epic.id}>
-                {epic.title}
-              </option>
+              <option key={epic.id} value={epic.id}>{epic.title}</option>
             ))}
           </select>
         </div>
       )}
-      <div className="flex gap-4 overflow-x-auto px-4 flex-1 pb-4">
-      {columns.map((col) => (
-        <KanbanColumn
-          key={col.key}
-          columnKey={col.key}
-          label={col.label}
-          color={col.color}
-          stories={storiesByStatus[col.key] || []}
-          selectedStoryId={selectedStoryId}
-          onSelectStory={setSelectedStory}
-        />
-      ))}
+      <div className="flex gap-3 overflow-x-auto px-4 flex-1 pb-4">
+        {columns.map((col) => (
+          <KanbanColumn
+            key={col.key}
+            columnKey={col.key}
+            label={col.label}
+            color={col.color}
+            stories={storiesByStatus[col.key] || []}
+            selectedStoryId={selectedStoryId}
+            activeIds={activeIds}
+            onSelectStory={setSelectedStory}
+          />
+        ))}
       </div>
     </div>
   );
