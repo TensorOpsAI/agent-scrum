@@ -56,8 +56,8 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div className="animate-spin rounded-full h-7 w-7 border-2 border-border border-t-primary" />
       </div>
     );
   }
@@ -67,23 +67,25 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex">
+    <div className="fixed inset-0 z-40 flex animate-fade-in">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Slide-over panel */}
-      <div className="relative ml-auto w-full max-w-4xl bg-gray-800 shadow-xl flex flex-col">
+      <div className="relative ml-auto w-full max-w-3xl bg-card border-l border-border shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-blue-500" />
-            <div>
-              <h2 className="text-lg font-semibold text-white">
+        <div className="flex items-center justify-between px-5 h-14 border-b border-border">
+          <div className="flex items-center gap-3 min-w-0">
+            <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-sm font-medium text-foreground truncate">
                 {itemNoun} #{story.id}
               </h2>
               <span className={clsx(
-                'text-xs px-2 py-0.5 rounded',
-                story.status === 'done' ? 'bg-green-600' : 'bg-gray-600'
+                'text-[11px] px-1.5 py-0.5 rounded font-medium border',
+                story.status === 'done'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-secondary border-border text-muted-foreground'
               )}>
                 {getStatusLabel(story.status, columns)}
               </span>
@@ -91,9 +93,10 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title="Close (Esc)"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 

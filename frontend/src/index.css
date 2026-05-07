@@ -1,7 +1,90 @@
+@import url('https://rsms.me/inter/inter.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-900 text-gray-100;
+@layer base {
+  :root {
+    /* Linear-style dark theme tokens (HSL components, no hsl() wrapper) */
+    --background: 240 6% 6%;          /* near-black */
+    --foreground: 0 0% 98%;
+    --card: 240 5% 10%;               /* surface */
+    --card-foreground: 0 0% 98%;
+    --popover: 240 5% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91% 60%;           /* blue-500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 14%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 60%;   /* zinc-400 */
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 16%;             /* zinc-800 */
+    --input: 240 4% 14%;
+    --ring: 217 91% 60%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'cv11' 1, 'ss01' 1;
+  }
+
+  /* Subtle scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(240 4% 18%);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(240 4% 26%);
+  }
+}
+
+@layer components {
+  /* Reusable surfaces */
+  .surface {
+    @apply bg-card border border-border rounded-lg;
+  }
+  .surface-muted {
+    @apply bg-muted/40 border border-border/60 rounded-lg;
+  }
+
+  /* Status dot */
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+
+  /* Subtle button base */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
+           text-sm text-muted-foreground hover:text-foreground hover:bg-accent
+           transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
+           text-sm font-medium bg-primary text-primary-foreground
+           hover:bg-primary/90 transition-colors
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-soft {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
+           text-sm font-medium bg-secondary text-secondary-foreground
+           hover:bg-accent transition-colors
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
 }
