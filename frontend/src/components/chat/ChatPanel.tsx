@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { chatApi, type ChatMessage } from '../../api/client';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useStoryStore } from '../../store/storyStore';
+import { eventBus } from '../../lib/eventBus';
 
 const BUILTIN_AGENT_COLORS: Record<string, string> = {
   product_owner: 'text-purple-400',
@@ -141,6 +142,20 @@ export function ChatPanel() {
       setMessages(prev => [...prev, lastMessage.data as ChatMessage]);
     }
   }, [lastMessage]);
+
+  // Demo replay messages (and clear-on-replay-skip)
+  useEffect(() => {
+    const offChat = eventBus.on('replay:chat', (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+    const offState = eventBus.on('replay:state', ({ isReplaying }) => {
+      if (!isReplaying) {
+        // When replay finishes/is skipped, drop synthetic (negative-id) messages
+        setMessages((prev) => prev.filter((m) => m.id > 0));
+      }
+    });
+    return () => { offChat(); offState(); };
+  }, []);
 
   useEffect(() => {
     const container = messagesContainerRef.current;

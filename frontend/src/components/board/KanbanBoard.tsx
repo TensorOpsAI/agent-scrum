@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { cn } from '../../lib/utils';
-import { FileText, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
+import { FileText, Sparkles, Zap, CheckCircle2, Play, RotateCcw, X } from 'lucide-react';
 import { useStoryStore } from '../../store/storyStore';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useUIStore } from '../../store/uiStore';
 import { useStoryActivity } from '../../hooks/useStoryActivity';
+import { useDemoReplay } from '../../hooks/useDemoReplay';
 import { simulateApi } from '../../api/client';
 import { StoryCard } from './StoryCard';
 import type { Story, PipelineColumn } from '../../types';
@@ -104,7 +105,7 @@ const WORKFLOW_STEPS: Record<string, { icon: React.ReactNode; steps: string[] }>
 };
 
 function EmptyBoardState({
-  inputNoun, itemNoun, templateId, onSubmit, isPublisher, onGenerate,
+  inputNoun, itemNoun, templateId, onSubmit, isPublisher, onGenerate, onReplay, hasPlayed,
 }: {
   inputNoun: string;
   itemNoun: string;
@@ -112,6 +113,8 @@ function EmptyBoardState({
   onSubmit: () => void;
   isPublisher: boolean;
   onGenerate?: () => void;
+  onReplay?: () => void;
+  hasPlayed?: boolean;
 }) {
   const workflow = WORKFLOW_STEPS[templateId] || WORKFLOW_STEPS.software_dev;
   const article = /^[aeiou]/i.test(inputNoun) ? 'an' : 'a';
@@ -155,6 +158,15 @@ function EmptyBoardState({
               Don't have one? The modal includes an example you can try instantly.
             </span>
           )}
+          {onReplay && hasPlayed && (
+            <button
+              onClick={onReplay}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Replay 30-second demo
+            </button>
+          )}
         </div>
 
         <div className="surface p-5 text-left">
@@ -193,6 +205,7 @@ export function KanbanBoard() {
   const openPRDModal = useUIStore((s) => s.openPRDModal);
   const { fetchStories } = useStoryStore();
   const activeIds = useStoryActivity();
+  const replay = useDemoReplay(currentBoard?.id ?? null);
 
   const epicNoun = currentBoard?.epic_noun ?? 'Epic';
   const inputNoun = currentBoard?.input_noun ?? 'PRD';
@@ -249,12 +262,53 @@ export function KanbanBoard() {
           await simulateApi.generate(currentBoard.id);
           fetchStories(currentBoard.id);
         }}
+        onReplay={replay.play}
+        hasPlayed={replay.hasPlayed}
       />
     );
   }
 
   return (
     <div className="flex flex-col h-full">
+      {replay.isReplaying && (
+        <div className="mx-4 mb-3 flex items-center gap-3 px-3 py-2 rounded-md border border-primary/30 bg-primary/8 animate-fade-in">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-foreground">Demo replay running</div>
+            <div className="text-[10px] text-muted-foreground">
+              Watching a recorded run of the software dev swarm shipping a feature
+            </div>
+          </div>
+          <button
+            onClick={replay.skip}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border hover:bg-accent text-foreground transition-colors"
+          >
+            <X className="w-3 h-3" />
+            Skip
+          </button>
+        </div>
+      )}
+      {!replay.isReplaying && replay.hasPlayed && stories.some((s) => s.id < 0) && (
+        <div className="mx-4 mb-3 flex items-center gap-3 px-3 py-2 rounded-md border border-border bg-card/40 animate-fade-in">
+          <Play className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-foreground">This was a demo replay</div>
+            <div className="text-[10px] text-muted-foreground">
+              Add your Gemini API key in Settings to run your own briefs through real agents
+            </div>
+          </div>
+          <button
+            onClick={replay.play}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border hover:bg-accent text-foreground transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Replay
+          </button>
+        </div>
+      )}
       {epics.length > 0 && (
         <div className="px-4 pb-3 flex items-center gap-2">
           <label className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{epicNoun}</label>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useWebSocket } from './useWebSocket';
+import { eventBus } from '../lib/eventBus';
 import type { Story } from '../types';
 
 const PULSE_DURATION_MS = 2500;
@@ -38,6 +39,25 @@ export function useStoryActivity(): Set<number> {
 
     return () => window.clearTimeout(timer);
   }, [lastMessage]);
+
+  // Also listen to demo-replay pulses on the event bus
+  useEffect(() => {
+    return eventBus.on('replay:story-pulse', ({ storyId }) => {
+      setActiveIds((prev) => {
+        const next = new Set(prev);
+        next.add(storyId);
+        return next;
+      });
+      window.setTimeout(() => {
+        setActiveIds((prev) => {
+          if (!prev.has(storyId)) return prev;
+          const next = new Set(prev);
+          next.delete(storyId);
+          return next;
+        });
+      }, PULSE_DURATION_MS);
+    });
+  }, []);
 
   return activeIds;
 }
