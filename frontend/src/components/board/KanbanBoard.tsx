@@ -205,7 +205,6 @@ export function KanbanBoard() {
   const openPRDModal = useUIStore((s) => s.openPRDModal);
   const { fetchStories } = useStoryStore();
   const activeIds = useStoryActivity();
-  const replay = useDemoReplay(currentBoard?.id ?? null);
 
   const epicNoun = currentBoard?.epic_noun ?? 'Epic';
   const inputNoun = currentBoard?.input_noun ?? 'PRD';
@@ -213,6 +212,8 @@ export function KanbanBoard() {
   const templateId = currentBoard?.template_id ?? 'software_dev';
   const automationEnabled = currentBoard?.agent_automation === true;
   const isPublisher = templateId === 'publisher';
+
+  const replay = useDemoReplay(currentBoard?.id ?? null, templateId);
 
   useEffect(() => {
     if (currentBoard?.id) fetchEpics(currentBoard.id);
@@ -279,7 +280,7 @@ export function KanbanBoard() {
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium text-foreground">Demo replay running</div>
             <div className="text-[10px] text-muted-foreground">
-              Watching a recorded run of the software dev swarm shipping a feature
+              {replay.headline ?? 'Watching a recorded run of the swarm'}
             </div>
           </div>
           <button

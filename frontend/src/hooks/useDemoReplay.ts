@@ -2,52 +2,48 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStoryStore } from '../store/storyStore';
 import { eventBus } from '../lib/eventBus';
 import { settingsApi } from '../api/client';
-import {
-  DEMO_TIMELINE,
-  DEMO_STORIES,
-  DEMO_TASKS,
-  DEMO_DURATION_MS,
-  type ReplayStep,
-} from '../fixtures/demoReplay';
+import { DEMO_TIMELINES, type ReplayStep, type DemoTimeline } from '../fixtures/demoReplay';
 import type { Story, Task } from '../types';
 
 const REPLAY_DONE_KEY = 'agent-scrum:demo-replay-played';
+/** How long to wait before auto-playing on first run, so the user can orient. */
+const AUTOPLAY_DELAY_MS = 3500;
 
-function buildStory(id: number): Story {
-  const seed = DEMO_STORIES[id];
-  return { ...seed, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-}
-
-function buildTask(id: number): Task {
-  const seed = DEMO_TASKS[id];
-  return { ...seed, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+function hydrate<T extends { id: number }>(seed: Omit<T, 'created_at' | 'updated_at'>): T {
+  const ts = new Date().toISOString();
+  return { ...seed, created_at: ts, updated_at: ts } as unknown as T;
 }
 
 interface UseDemoReplayResult {
   isReplaying: boolean;
   hasPlayed: boolean;
+  isSupported: boolean;
+  headline: string | null;
   play: () => void;
   skip: () => void;
 }
 
 /**
- * Plays a pre-recorded "agents shipping a feature" run on first visit.
- * Auto-triggers when there's no API key + the board is empty.
- * Mutates the story store directly and emits chat events on the eventBus.
+ * Plays a pre-recorded run on first visit.
+ * Auto-triggers when there's no API key + the board is empty + we have
+ * a timeline registered for the current template.
  */
-export function useDemoReplay(boardId: number | null): UseDemoReplayResult {
+export function useDemoReplay(boardId: number | null, templateId: string | null): UseDemoReplayResult {
   const [isReplaying, setIsReplaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(
     () => typeof window !== 'undefined' && window.localStorage.getItem(REPLAY_DONE_KEY) === 'true'
   );
   const timersRef = useRef<number[]>([]);
 
-  const dispatch = useCallback((step: ReplayStep) => {
+  const timeline: DemoTimeline | null = templateId ? DEMO_TIMELINES[templateId] ?? null : null;
+
+  const dispatch = useCallback((step: ReplayStep, tl: DemoTimeline) => {
     const store = useStoryStore.getState();
     switch (step.type) {
       case 'story-add': {
-        const story = buildStory(step.data.storyId);
-        store.addStory(story);
+        const seed = tl.stories[step.data.storyId];
+        if (!seed) return;
+        store.addStory(hydrate<Story>(seed));
         break;
       }
       case 'story-update': {
@@ -63,7 +59,9 @@ export function useDemoReplay(boardId: number | null): UseDemoReplayResult {
         break;
       }
       case 'task-add': {
-        store.addTask(buildTask(step.data.taskId));
+        const seed = tl.tasks[step.data.taskId];
+        if (!seed) return;
+        store.addTask(hydrate<Task>(seed));
         break;
       }
       case 'agent-status': {
@@ -90,7 +88,6 @@ export function useDemoReplay(boardId: number | null): UseDemoReplayResult {
     const store = useStoryStore.getState();
     const realStories = store.stories.filter((s) => s.id > 0);
     useStoryStore.setState({ stories: realStories });
-    // Reset agents to idle
     const realAgents = store.agents.map((a) => ({ ...a, status: 'idle' as const, currentTask: null }));
     useStoryStore.setState({ agents: realAgents });
   }, []);
@@ -109,40 +106,43 @@ export function useDemoReplay(boardId: number | null): UseDemoReplayResult {
   }, [cleanup, removeDemoData, finish]);
 
   const play = useCallback(() => {
-    if (isReplaying) return;
+    if (isReplaying || !timeline) return;
     cleanup();
-    removeDemoData(); // Clean any leftovers from a previous play
+    removeDemoData();
     setIsReplaying(true);
     eventBus.emit('replay:state', { isReplaying: true });
 
-    DEMO_TIMELINE.forEach(({ t, step }) => {
-      const id = window.setTimeout(() => dispatch(step), t);
+    timeline.steps.forEach(({ t, step }) => {
+      const id = window.setTimeout(() => dispatch(step, timeline), t);
       timersRef.current.push(id);
     });
 
-    const endId = window.setTimeout(finish, DEMO_DURATION_MS + 500);
+    const endId = window.setTimeout(finish, timeline.durationMs + 1000);
     timersRef.current.push(endId);
-  }, [isReplaying, cleanup, removeDemoData, dispatch, finish]);
+  }, [isReplaying, timeline, cleanup, removeDemoData, dispatch, finish]);
 
-  // Auto-play on mount when conditions are right
+  // Auto-play on first run
   useEffect(() => {
-    if (boardId == null) return;
+    if (boardId == null || !timeline) return;
     if (hasPlayed) return;
 
     const hasApiKey = !!settingsApi.getLocalApiKey();
     const realStoryCount = useStoryStore.getState().stories.filter((s) => s.id > 0).length;
-
-    // Only autoplay for first-run users: no key AND no real stories
     if (hasApiKey || realStoryCount > 0) return;
 
-    // Slight delay so the page paints first
-    const id = window.setTimeout(() => play(), 600);
+    const id = window.setTimeout(() => play(), AUTOPLAY_DELAY_MS);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId, hasPlayed]);
+  }, [boardId, templateId, hasPlayed]);
 
-  // Cleanup on unmount
   useEffect(() => () => cleanup(), [cleanup]);
 
-  return { isReplaying, hasPlayed, play, skip };
+  return {
+    isReplaying,
+    hasPlayed,
+    isSupported: timeline != null,
+    headline: timeline?.headline ?? null,
+    play,
+    skip,
+  };
 }
