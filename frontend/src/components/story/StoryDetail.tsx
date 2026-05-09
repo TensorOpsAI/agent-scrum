@@ -6,6 +6,8 @@ import { ActivityLog } from './ActivityLog';
 import type { Story, Task, Comment } from '../../types';
 import { getSubItemStatusLabel, getAgentLabel, getAgentColor, getStatusLabel } from '../../types';
 import { usePipelineStore } from '../../store/pipelineStore';
+import { useStoryStore } from '../../store/storyStore';
+import { getDemoComments } from '../../fixtures/demoReplay';
 
 interface StoryDetailProps {
   storyId: number;
@@ -27,32 +29,52 @@ export function StoryDetail({ storyId, onClose }: StoryDetailProps) {
   const columns = usePipelineStore((s) => s.activeConfig?.columns ?? []);
   const itemNoun = usePipelineStore((s) => s.activeConfig?.item_noun ?? 'Story');
   const subItemNoun = usePipelineStore((s) => s.activeConfig?.sub_item_noun ?? 'Task');
-  const [story, setStory] = useState<Story | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
+  // Demo-replay stories live only in the Zustand store (negative ids).
+  // Hydrate from the store so the panel works without backend round-trips.
+  const storeStory = useStoryStore((s) => s.stories.find((x) => x.id === storyId) ?? null);
+  const storeTasks = useStoryStore((s) => s.tasks.filter((t) => t.story_id === storyId));
+  const isSynthetic = storyId < 0;
+  const [story, setStory] = useState<Story | null>(isSynthetic ? storeStory : null);
+  const [tasks, setTasks] = useState<Task[]>(isSynthetic ? storeTasks : []);
+  const [comments, setComments] = useState<Comment[]>(isSynthetic ? getDemoComments(storyId) : []);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isSynthetic);
 
   useEffect(() => {
+    if (isSynthetic) {
+      setStory(storeStory);
+      setTasks(storeTasks);
+      setComments(getDemoComments(storyId));
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     async function fetchData() {
       setLoading(true);
-      try {
-        const [storyData, tasksData, commentsData] = await Promise.all([
-          storyApi.get(storyId),
-          taskApi.list(storyId),
-          storyApi.getComments(storyId),
-        ]);
-        setStory(storyData);
-        setTasks(tasksData);
-        setComments(commentsData);
-      } catch (error) {
-        console.error('Error fetching story details:', error);
-      } finally {
-        setLoading(false);
+      const [storyRes, tasksRes, commentsRes] = await Promise.allSettled([
+        storyApi.get(storyId),
+        taskApi.list(storyId),
+        storyApi.getComments(storyId),
+      ]);
+      if (cancelled) return;
+      if (storyRes.status === 'fulfilled') {
+        setStory(storyRes.value);
+      } else {
+        console.error('Error fetching story:', storyRes.reason);
+        // Fall back to whatever we have in the store so the panel still opens.
+        setStory(storeStory);
       }
+      setTasks(tasksRes.status === 'fulfilled' ? tasksRes.value : storeTasks);
+      setComments(commentsRes.status === 'fulfilled' ? commentsRes.value : []);
+      setLoading(false);
     }
     fetchData();
-  }, [storyId]);
+    return () => {
+      cancelled = true;
+    };
+    // storeStory/storeTasks intentionally omitted — we read them once on fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyId, isSynthetic]);
 
   if (loading) {
     return (

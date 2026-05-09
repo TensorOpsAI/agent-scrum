@@ -7,10 +7,12 @@
  * chat messages through the event bus.
  */
 
-import type { Story, Task } from '../types';
+import type { Story, Task, Comment } from '../types';
 
 type StorySeed = Omit<Story, 'created_at' | 'updated_at'>;
 type TaskSeed = Omit<Task, 'created_at' | 'updated_at'>;
+/** Comment fixture without a timestamp; `secondsAgo` controls relative ordering. */
+type CommentSeed = Omit<Comment, 'created_at'> & { secondsAgo: number };
 
 const now = () => new Date().toISOString();
 
@@ -38,6 +40,8 @@ interface ChatPayload {
 export interface DemoTimeline {
   stories: Record<number, StorySeed>;
   tasks: Record<number, TaskSeed>;
+  /** Comments per story, shown in the StoryDetail Activity tab for synthetic stories. */
+  comments?: Record<number, CommentSeed[]>;
   steps: Array<{ t: number; step: ReplayStep }>;
   durationMs: number;
   /** A short headline shown in the replay banner. */
@@ -94,6 +98,55 @@ const publisherStories: Record<number, StorySeed> = {
     status: 'inbox', priority: 1, prd_content: null,
     task_count: 0, completed_task_count: 0,
   },
+};
+
+const publisherComments: Record<number, CommentSeed[]> = {
+  [-101]: [
+    {
+      id: -1001, story_id: -101, task_id: null, agent_type: 'news_curator',
+      content: 'Triaged this morning. Embargo lifts at 9am ET — making it the lead.',
+      metadata: { action: 'triaged' },
+      secondsAgo: 540,
+    },
+    {
+      id: -1002, story_id: -101, task_id: null, agent_type: 'journalist',
+      content: '600-word draft up. Lede on the 30-minute video benchmark, plus context on competing models and an Altman quote.',
+      metadata: { action: 'drafted' },
+      secondsAgo: 360,
+    },
+    {
+      id: -1003, story_id: -101, task_id: null, agent_type: 'editor',
+      content: 'Pushed back on the lede and a thin Hugging Face quote. Journalist agreed to cut the quote rather than weaken the piece.',
+      metadata: { action: 'reviewed', approved: false },
+      secondsAgo: 240,
+    },
+    {
+      id: -1004, story_id: -101, task_id: null, agent_type: 'editor',
+      content: 'Revised draft is tighter. Approved.',
+      metadata: { action: 'approved', approved: true },
+      secondsAgo: 180,
+    },
+    {
+      id: -1005, story_id: -101, task_id: null, agent_type: 'creative_director',
+      content: 'Hero image: clean shot of the new product page over the standard OpenAI logo treatment. Less promotional.',
+      metadata: { action: 'visuals_added' },
+      secondsAgo: 90,
+    },
+    {
+      id: -1006, story_id: -101, task_id: null, agent_type: 'news_curator',
+      content: 'Embargo lifted. Pushed live.',
+      metadata: { action: 'published' },
+      secondsAgo: 20,
+    },
+  ],
+  [-103]: [
+    {
+      id: -1101, story_id: -103, task_id: null, agent_type: 'news_curator',
+      content: 'Holding this until we have a second source on the funding figure. One named source isn\'t enough.',
+      metadata: { action: 'on_hold' },
+      secondsAgo: 480,
+    },
+  ],
 };
 
 const publisherTimeline: Array<{ t: number; step: ReplayStep }> = [
@@ -162,6 +215,47 @@ const softwareTasks: Record<number, TaskSeed> = {
   [-303]: { id: -303, story_id: -202, title: 'Login endpoint integration tests', description: null, implementation_notes: null, test_scenarios: null, status: 'pending_review', assigned_agent: 'qa' },
 };
 
+const softwareComments: Record<number, CommentSeed[]> = {
+  [-202]: [
+    {
+      id: -2001, story_id: -202, task_id: null, agent_type: 'product_owner',
+      content: 'Split out from the auth PRD. Most security surface area of the three — taking this one first.',
+      metadata: { action: 'created' },
+      secondsAgo: 600,
+    },
+    {
+      id: -2002, story_id: -202, task_id: null, agent_type: 'tech_lead',
+      content: 'Scoping: bcrypt for hashing, sliding-window rate limit per IP. Three tasks. Handing to Developer.',
+      metadata: { action: 'scoped' },
+      secondsAgo: 480,
+    },
+    {
+      id: -2003, story_id: -202, task_id: null, agent_type: 'developer',
+      content: 'Tasks broken out and login + bcrypt landed. Pushing for review.',
+      metadata: { action: 'implemented' },
+      secondsAgo: 320,
+    },
+    {
+      id: -2004, story_id: -202, task_id: null, agent_type: 'code_reviewer',
+      content: 'Two asks: rate-limit window should be configurable, and we should log failed attempts. Otherwise LGTM.',
+      metadata: { action: 'reviewed', approved: false },
+      secondsAgo: 220,
+    },
+    {
+      id: -2005, story_id: -202, task_id: null, agent_type: 'developer',
+      content: 'Both addressed — config flag for the window, structured log on failed attempts.',
+      metadata: { action: 'revised' },
+      secondsAgo: 140,
+    },
+    {
+      id: -2006, story_id: -202, task_id: null, agent_type: 'qa',
+      content: '4/4 scenarios pass: happy path, wrong password, locked-out account, rate-limit trigger. Closing this out.',
+      metadata: { action: 'qa_passed', approved: true },
+      secondsAgo: 30,
+    },
+  ],
+};
+
 const softwareTimeline: Array<{ t: number; step: ReplayStep }> = [
   { t:   400, step: { type: 'agent-status', data: { agentId: 'product_owner', status: 'working', task: 'Breaking down auth PRD' } } },
   { t:   900, step: msg(-1, 'product_owner', 'Product Owner', 'Got the auth PRD. Breaking this into 3 stories — sign-up, login, and password reset.') },
@@ -218,6 +312,7 @@ export const DEMO_TIMELINES: Record<string, DemoTimeline> = {
   publisher: {
     stories: publisherStories,
     tasks: {},
+    comments: publisherComments,
     steps: publisherTimeline,
     durationMs: 26500,
     headline: 'Watching a recorded run of the editorial swarm shipping a breaking-news article',
@@ -225,8 +320,28 @@ export const DEMO_TIMELINES: Record<string, DemoTimeline> = {
   software_dev: {
     stories: softwareStories,
     tasks: softwareTasks,
+    comments: softwareComments,
     steps: softwareTimeline,
     durationMs: 27500,
     headline: 'Watching a recorded run of the dev swarm shipping a login feature',
   },
 };
+
+/**
+ * Returns hydrated comments for a synthetic (negative-id) story across all
+ * registered timelines, sorted oldest first. Empty list if none seeded.
+ */
+export function getDemoComments(storyId: number): Comment[] {
+  for (const tl of Object.values(DEMO_TIMELINES)) {
+    const seeds = tl.comments?.[storyId];
+    if (!seeds) continue;
+    const nowMs = Date.now();
+    return [...seeds]
+      .sort((a, b) => b.secondsAgo - a.secondsAgo)
+      .map(({ secondsAgo, ...rest }) => ({
+        ...rest,
+        created_at: new Date(nowMs - secondsAgo * 1000).toISOString(),
+      }));
+  }
+  return [];
+}
