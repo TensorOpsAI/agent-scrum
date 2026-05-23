@@ -2,7 +2,11 @@
 
 A multi-agent simulation platform where AI agents self-organize to process work across different domains. Create boards for Publishing, Software Development, Talent Acquisition, Sales, or Security Operations - each with its own domain-specific agents that collaborate in real-time on a Kanban board.
 
-[![Agent Scrum Demo](https://img.youtube.com/vi/iztjBErDY18/maxresdefault.jpg)](https://www.youtube.com/watch?v=iztjBErDY18)
+**[Try the live demo](https://tensorops.ai/agent-scrum)** &nbsp;·&nbsp; **[Read the deep-dive](https://tensorops.ai/blog/beyond-the-single-agent-building-a-jira--slack-for-ai-swarms-with-langgraph-google-a2a-and-mcp)** &nbsp;·&nbsp; **[Watch the explainer](https://www.youtube.com/watch?v=4yiZrAUdGVI)**
+
+[![Agent Scrum explainer video](https://img.youtube.com/vi/4yiZrAUdGVI/maxresdefault.jpg)](https://www.youtube.com/watch?v=4yiZrAUdGVI)
+
+> *"Beyond the single agent: building a Jira + Slack for AI swarms with LangGraph, Google A2A, and MCP."* &mdash; [blog post](https://tensorops.ai/blog/beyond-the-single-agent-building-a-jira--slack-for-ai-swarms-with-langgraph-google-a2a-and-mcp)
 
 ## Quick Start
 
