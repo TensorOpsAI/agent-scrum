@@ -46,13 +46,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS — allow all origins (Cloud Run provides its own domain)
+# CORS — wildcard origin is acceptable only because auth is header-based, not
+# cookie-based; credentials must stay disabled while the origin is "*".
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Session-Id", "X-Api-Key"],
 )
 
 
