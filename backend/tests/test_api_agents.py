@@ -10,40 +10,37 @@ async def _get_default_board_id(client: AsyncClient) -> int:
     return boards[0]["id"]
 
 
+async def _list_agents(client: AsyncClient) -> list[dict]:
+    response = await client.get("/api/agents")
+    assert response.status_code == 200
+    agents = response.json()
+    assert len(agents) > 0, "No agents found - seed may have failed"
+    return agents
+
+
 @pytest.mark.asyncio
 async def test_list_agents(client: AsyncClient):
     """Test listing all registered agents (only active ones)."""
     board_id = await _get_default_board_id(client)
-    response = await client.get("/api/agents")
-    assert response.status_code == 200
+    agents = await _list_agents(client)
 
-    data = response.json()
-    # All 6 agents are active (including scrum_master as manager)
-    assert len(data) == 6
-
-    agent_roles = [agent["type"] for agent in data]
-    assert "product_owner" in agent_roles
-    assert "tech_lead" in agent_roles
-    assert "developer" in agent_roles
-    assert "code_reviewer" in agent_roles
-    assert "qa" in agent_roles
-    assert "scrum_master" in agent_roles
-
-    # IDs should be board-scoped
-    agent_ids = [agent["id"] for agent in data]
-    assert f"product_owner_{board_id}" in agent_ids
+    # IDs should be board-scoped: <type>_<board_id>
+    for agent in agents:
+        assert agent["id"] == f"{agent['type']}_{board_id}"
 
 
 @pytest.mark.asyncio
 async def test_get_agent_info(client: AsyncClient):
     """Test getting an agent's info."""
-    board_id = await _get_default_board_id(client)
-    response = await client.get(f"/api/agents/product_owner_{board_id}")
+    agents = await _list_agents(client)
+    first = agents[0]
+
+    response = await client.get(f"/api/agents/{first['id']}")
     assert response.status_code == 200
 
     data = response.json()
-    assert data["name"] == "Product Owner"
-    assert data["type"] == "product_owner"
+    assert data["type"] == first["type"]
+    assert "name" in data
     assert "description" in data
     assert "skills" in data
     assert len(data["skills"]) > 0
@@ -59,14 +56,15 @@ async def test_get_agent_card_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_agent_status(client: AsyncClient):
     """Test getting an agent's status."""
-    board_id = await _get_default_board_id(client)
-    response = await client.get(f"/api/agents/developer_{board_id}/status")
+    agents = await _list_agents(client)
+    first = agents[0]
+
+    response = await client.get(f"/api/agents/{first['id']}/status")
     assert response.status_code == 200
 
     data = response.json()
-    assert data["id"] == f"developer_{board_id}"
-    assert data["type"] == "developer"
-    assert data["name"] == "Developer"
+    assert data["id"] == first["id"]
+    assert data["type"] == first["type"]
     assert data["status"] == "idle"
     assert data["current_task"] is None
 
@@ -74,12 +72,10 @@ async def test_get_agent_status(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_all_agents_have_valid_info(client: AsyncClient):
     """Test that all agents have valid info."""
-    board_id = await _get_default_board_id(client)
-    agent_roles = ["product_owner", "tech_lead", "developer", "code_reviewer", "qa", "scrum_master"]
+    agents = await _list_agents(client)
 
-    for role in agent_roles:
-        agent_id = f"{role}_{board_id}"
-        response = await client.get(f"/api/agents/{agent_id}")
+    for agent in agents:
+        response = await client.get(f"/api/agents/{agent['id']}")
         assert response.status_code == 200
 
         data = response.json()

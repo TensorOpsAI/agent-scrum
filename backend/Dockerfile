@@ -7,9 +7,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies from the lock for reproducible builds
+# (requirements.txt holds the direct deps; regenerate the lock with
+#  `pip freeze > requirements.lock` after changing it)
+COPY requirements.lock .
+RUN pip install --no-cache-dir -r requirements.lock
 
 # Copy application code
 COPY . .

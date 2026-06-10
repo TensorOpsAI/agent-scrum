@@ -3,8 +3,29 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Story, Task, StoryStatus, PipelineConfig
-from app.agents.executor import set_swarm_active, is_swarm_active
+from app.session import (
+    UserSession,
+    _current_session,
+    set_swarm_active,
+    is_swarm_active,
+)
 from app.workflow.orchestrator import WorkflowOrchestrator
+
+
+@pytest.fixture
+def session_ctx():
+    """Bind a minimal UserSession to the contextvar (swarm flags are session-scoped)."""
+    from app.agents.executor import AgentExecutor
+
+    session = UserSession(
+        id="test-session",
+        engine=None,
+        session_maker=None,
+        executor=AgentExecutor(),
+    )
+    token = _current_session.set(session)
+    yield session
+    _current_session.reset(token)
 
 # Mock pipeline that has automation enabled (software dev)
 MOCK_AUTOMATION_PIPELINE = {
@@ -123,7 +144,7 @@ async def test_all_task_statuses_covered(orchestrator):
 
 
 @pytest.mark.asyncio
-async def test_swarm_active_flag():
+async def test_swarm_active_flag(session_ctx):
     """Test that set_swarm_active / is_swarm_active work correctly."""
     set_swarm_active(False)
     assert is_swarm_active() is False
@@ -136,13 +157,13 @@ async def test_swarm_active_flag():
 
 
 @pytest.mark.asyncio
-async def test_execute_agent_skips_when_swarm_inactive(orchestrator, test_session: AsyncSession):
+async def test_execute_agent_skips_when_swarm_inactive(orchestrator, test_session: AsyncSession, session_ctx):
     """Test that execute_agent returns early when swarm is not active."""
-    from app.agents.executor import executor
+    from app.agents.executor import AgentExecutor
 
     set_swarm_active(False)
 
-    result = await executor.execute_agent(
+    result = await AgentExecutor().execute_agent(
         agent_id="product_owner",
         message="test message",
         context={},
@@ -156,7 +177,7 @@ async def test_execute_agent_skips_when_swarm_inactive(orchestrator, test_sessio
 
 
 @pytest.mark.asyncio
-async def test_trigger_prd_skips_when_swarm_inactive(test_session: AsyncSession, test_board: PipelineConfig):
+async def test_trigger_prd_skips_when_swarm_inactive(test_session: AsyncSession, test_board: PipelineConfig, session_ctx):
     """Test that on_prd_submitted returns early when swarm is not active."""
     from app.workflow.triggers import on_prd_submitted
 

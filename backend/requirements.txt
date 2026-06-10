@@ -1,6 +1,8 @@
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
-sqlalchemy>=2.0.25
+# [asyncio] extra pulls in greenlet, which SQLAlchemy's async engine requires
+# but no longer installs by default
+sqlalchemy[asyncio]>=2.0.25
 aiosqlite>=0.19.0
 pydantic>=2.6.0
 pydantic-settings>=2.1.0

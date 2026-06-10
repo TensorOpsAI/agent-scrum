@@ -3,7 +3,13 @@ import pytest
 from datetime import datetime, timedelta
 
 from app.agents.swarm.graph import is_stuck, STUCK_THRESHOLD
-from app.agents.executor import executor, AGENT_CAPACITY
+from app.agents.executor import AgentExecutor, AGENT_CAPACITY
+
+
+@pytest.fixture
+def executor():
+    """Fresh per-session executor (executors are session-scoped, not global)."""
+    return AgentExecutor()
 
 
 def test_is_stuck_returns_true_for_old_items():
@@ -32,7 +38,7 @@ def test_is_stuck_boundary():
     assert is_stuck(just_over) is True
 
 
-def test_executor_has_capacity():
+def test_executor_has_capacity(executor):
     """Test executor capacity checking."""
     # All defined agents should have capacity
     for agent_id in AGENT_CAPACITY.keys():
@@ -47,7 +53,7 @@ def test_executor_capacity_limits():
         assert AGENT_CAPACITY[agent_id] >= 1
 
 
-def test_executor_is_working_on_returns_false_initially():
+def test_executor_is_working_on_returns_false_initially(executor):
     """Test that executor reports no work initially."""
     for agent_id in AGENT_CAPACITY.keys():
         assert executor.is_working_on(agent_id, "some_work_key") is False
