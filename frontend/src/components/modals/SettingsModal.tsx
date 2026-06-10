@@ -262,7 +262,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* Footer */}
         <div className="px-5 py-2.5 border-t border-border bg-card/40 shrink-0">
           <p className="text-[10px] text-muted-foreground text-center">
-            🔒 API key is stored in your browser only. It's never sent to the server.
+            🔒 API key is stored in this browser tab only and sent with your requests so the backend can call Gemini. It is never persisted server-side.
           </p>
         </div>
       </div>
