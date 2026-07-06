@@ -287,11 +287,25 @@ async def create_task(
         The created task details
     """
     async with get_current_session_maker()() as db:
+        # Default to the board's first valid sub-item status so the swarm's
+        # task_handlers (which don't know about "draft") can actually pick it up.
+        default_status = "draft"
+        story_result = await db.execute(select(Story).where(Story.id == story_id))
+        story = story_result.scalar_one_or_none()
+        if story:
+            from app.db.models import PipelineConfig
+            board_result = await db.execute(
+                select(PipelineConfig).where(PipelineConfig.id == story.board_id)
+            )
+            board = board_result.scalar_one_or_none()
+            if board and board.sub_item_statuses:
+                default_status = board.sub_item_statuses[0]
+
         task = Task(
             story_id=story_id,
             title=title,
             description=description,
-            status="draft",
+            status=default_status,
         )
         db.add(task)
         await db.commit()

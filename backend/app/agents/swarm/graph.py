@@ -31,6 +31,14 @@ MIN_WORKING_TIME = 3.0
 # ============================================================================
 
 ACTION_LABELS = {
+    # Publisher
+    "write_article": "Redacta",
+    "review_article": "Revisa",
+    "create_visuals": "Crea los elementos visuales para",
+    "publish": "Publica",
+    "draft_section": "Redacta",
+    "review_section": "Revisa",
+    "attach_media": "Adjunta los medios de",
     # Software Dev
     "breakdown": "break down",
     "review_tasks": "review the tasks for",
@@ -238,12 +246,12 @@ def group_by_board(board_data: dict) -> dict[int, list[dict]]:
 
 
 def build_assignment_message(work: dict) -> str:
-    """Generate a natural Manager→Worker assignment message."""
+    """Generate a natural Manager→Worker assignment message (Spanish, publisher template)."""
     item = work["item"]
     action = item.get("action", "process")
     action_label = ACTION_LABELS.get(action, action.replace("_", " "))
-    item_type = "story" if work["type"] == "story" else "task"
-    return f"Please {action_label} {item_type} #{item['id']}: {item['title']}"
+    item_type, article = ("artículo", "el") if work["type"] == "story" else ("sección", "la")
+    return f"{action_label} {article} {item_type} #{item['id']}: {item['title']}"
 
 
 def build_work_context(work: dict) -> dict:

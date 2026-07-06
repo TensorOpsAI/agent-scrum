@@ -952,7 +952,11 @@ This task involves implementing the required functionality as specified.
         if not passed:
             # Use rejection text from DOMAIN_REJECTIONS if available
             rejection_texts = DOMAIN_REJECTIONS.get(template_id, {}).get(role, {}).get(action, [])
-            reject_text = random.choice(rejection_texts) if rejection_texts else f"{role.replace('_', ' ').title()} review: {reason}. Not advancing."
+            if rejection_texts:
+                reject_text = random.choice(rejection_texts)
+            else:
+                role_label = PUBLISHER_ROLE_LABELS.get(role, role.replace('_', ' ').title())
+                reject_text = f"Revisión de {role_label}: {reason}. No se avanza."
 
             # Add rejection comment
             try:
@@ -1062,9 +1066,9 @@ This task involves implementing the required functionality as specified.
         """Get domain-specific sub-items to create for a story."""
         sub_items_map = {
             "publisher": [
-                ("Draft introduction and hook", "Write an engaging opening paragraph that captures reader attention"),
-                ("Research and fact-check key claims", "Verify all facts, statistics, and quotes cited in the article"),
-                ("Write body sections with supporting evidence", "Develop the main content sections with data and expert perspectives"),
+                ("Redactar la introducción y el gancho inicial", "Escribir un primer párrafo atractivo que capte la atención del lector"),
+                ("Investigar y verificar los datos clave", "Comprobar todos los datos, estadísticas y citas mencionados en el artículo"),
+                ("Redactar el cuerpo del artículo con datos de apoyo", "Desarrollar las secciones principales con datos y opiniones de expertos"),
             ],
             "talent_acquisition": [
                 ("Review resume and qualifications", "Check candidate's experience and skills against job requirements"),
@@ -1249,43 +1253,43 @@ This task involves implementing the required functionality as specified.
             base_rate = max(0.20, min(base_rate, 0.95))
             if random.random() > base_rate:
                 reasons = [
-                    "Article tone inconsistent with editorial guidelines",
-                    "Unverified claims need source confirmation",
-                    "Lead paragraph doesn't effectively capture the story angle",
-                    "Article structure needs rework for readability",
+                    "El tono del artículo no encaja con las directrices editoriales",
+                    "Hay afirmaciones sin verificar que necesitan confirmación de fuentes",
+                    "La entradilla no capta bien el enfoque de la noticia",
+                    "La estructura del artículo necesita mejorar la legibilidad",
                 ]
                 return False, random.choice(reasons)
-            return True, "Article meets editorial standards"
+            return True, "El artículo cumple los estándares editoriales"
 
         if action == "create_visuals":
             if random.random() > 0.85:
                 reasons = [
-                    "Proposed visuals don't match article tone",
-                    "Image licensing issues with selected assets",
-                    "Thumbnail doesn't meet brand guidelines",
+                    "Los elementos visuales propuestos no encajan con el tono del artículo",
+                    "Hay problemas de licencia con las imágenes seleccionadas",
+                    "La miniatura no cumple las directrices de marca",
                 ]
                 return False, random.choice(reasons)
-            return True, "Visuals approved"
+            return True, "Elementos visuales aprobados"
 
         if action == "publish":
             if random.random() > 0.90:
                 reasons = [
-                    "SEO analysis shows poor keyword coverage",
-                    "Publication schedule conflict detected",
-                    "Final review caught formatting issues",
+                    "El análisis SEO muestra una cobertura de palabras clave deficiente",
+                    "Se ha detectado un conflicto en el calendario de publicación",
+                    "La revisión final encontró problemas de formato",
                 ]
                 return False, random.choice(reasons)
-            return True, "Ready for publication"
+            return True, "Listo para publicar"
 
         if action in ("draft_section", "review_section", "attach_media"):
             if random.random() > 0.85:
                 reasons = [
-                    "Section needs additional supporting evidence",
-                    "Writing quality below editorial standards",
-                    "Media assets don't complement the content",
+                    "La sección necesita más evidencia de apoyo",
+                    "La calidad de redacción está por debajo del estándar editorial",
+                    "Los elementos multimedia no complementan bien el contenido",
                 ]
                 return False, random.choice(reasons)
-            return True, "Section approved"
+            return True, "Sección aprobada"
 
         # --- CISO ---
         if action in ("audit", "compliance_review"):
@@ -1844,42 +1848,60 @@ DOMAIN_SIMULATIONS = {
 # For task handlers: where rejected tasks go
 
 REJECTION_STATUSES = {
-    "publisher": {"story": "inbox", "task": "pending"},
+    # "inbox" isn't watched by TEMPLATE_WORKFLOWS' story_handlers — a rejected
+    # article sent there would never be picked up again. Send it back to
+    # "writing" so the journalist actually gets another pass at it.
+    "publisher": {"story": "writing", "task": "pending"},
     "talent_acquisition": {"story": "sourced", "task": None},
     "sales": {"story": "closed_lost", "task": None},
     "ciso": {"story": "mitigating", "task": "identified"},
 }
 
+PUBLISHER_ROLE_LABELS = {
+    "news_curator": "Curador de Noticias",
+    "journalist": "Periodista",
+    "editor": "Editor",
+    "creative_director": "Director Creativo",
+    "publisher_agent": "Publicador",
+    "editor_in_chief": "Redactor Jefe",
+}
+
 # Rejection-specific response texts keyed by (template_id, role, action)
 DOMAIN_REJECTIONS = {
     "publisher": {
+        "journalist": {
+            "draft_section": [
+                "La sección necesita más evidencia de apoyo. Se solicitan fuentes adicionales.",
+                "La calidad de redacción está por debajo del estándar editorial. Necesita revisión.",
+            ],
+        },
         "editor": {
             "review_article": [
-                "Article needs significant revision. Tone inconsistent with editorial guidelines. Sending back to writing.",
-                "Fact-check flagged unverified claims. Sources need to be confirmed before proceeding.",
-                "Article structure needs rework. Lead paragraph doesn't capture the story angle. Back to writing.",
+                "El artículo necesita una revisión importante. El tono no encaja con las directrices editoriales. Vuelve a redacción.",
+                "La verificación de datos ha detectado afirmaciones sin confirmar. Hay que confirmar las fuentes antes de continuar.",
+                "La estructura del artículo necesita ajustes. La entradilla no capta el enfoque de la noticia. Vuelve a redacción.",
             ],
             "review_section": [
-                "Section lacks supporting evidence. Additional sources needed.",
-                "Writing quality below editorial standards. Needs revision.",
+                "La sección carece de evidencia de apoyo. Se necesitan fuentes adicionales.",
+                "La calidad de redacción está por debajo del estándar editorial. Necesita revisión.",
             ],
         },
         "creative_director": {
             "create_visuals": [
-                "Proposed visuals don't match article tone. Need fresh creative direction. Back to editing.",
-                "Image licensing issues detected. Cannot use selected assets. Needs new visual approach.",
-                "Thumbnail doesn't meet brand guidelines. Reworking creative assets.",
+                "Los elementos visuales propuestos no encajan con el tono del artículo. Se necesita un nuevo enfoque creativo. Vuelve a edición.",
+                "Se han detectado problemas de licencia en las imágenes. No se pueden usar los archivos seleccionados. Se necesita un nuevo enfoque visual.",
+                "La miniatura no cumple las directrices de marca. Se están rehaciendo los elementos creativos.",
             ],
             "attach_media": [
-                "Media assets don't complement the section content. Needs different visuals.",
-                "Image resolution too low for publication standards. Needs replacement.",
+                "Los elementos multimedia no complementan el contenido de la sección. Se necesitan otros elementos visuales.",
+                "La resolución de la imagen es demasiado baja para los estándares de publicación. Necesita sustituirse.",
             ],
         },
         "publisher_agent": {
             "publish": [
-                "SEO analysis shows poor keyword coverage. Content needs optimization before publishing.",
-                "Publication schedule conflict. Slot unavailable. Rescheduling needed.",
-                "Final review caught formatting issues. Sending back for fixes before going live.",
+                "El análisis SEO muestra una cobertura de palabras clave deficiente. El contenido necesita optimización antes de publicarse.",
+                "Conflicto en el calendario de publicación. No hay hueco disponible. Hay que reprogramar.",
+                "La revisión final encontró problemas de formato. Se envía de vuelta para corregirlo antes de publicar.",
             ],
         },
     },
