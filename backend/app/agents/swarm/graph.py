@@ -291,9 +291,13 @@ class ScrumSwarm:
         return "running"
 
     async def dispatch_one(self, manager_id: str, worker_id: str, work: dict):
-        """Manager assigns one work item to a worker via A2A."""
-        self._working_agents[worker_id] = work["work_key"]
+        """Manager assigns one work item to a worker via A2A.
 
+        Caller must have already reserved `worker_id` in `self._working_agents`
+        before invoking this — reservation has to happen synchronously in the
+        dispatch loop so two items destined for the same worker can never both
+        pass the "is this worker free?" check when running concurrently.
+        """
         try:
             from app.session import get_current_a2a_router
 
@@ -318,11 +322,18 @@ class ScrumSwarm:
             self._working_agents.pop(worker_id, None)
 
     async def dispatch_pending_work(self):
-        """Manager scans boards and dispatches work to workers via A2A."""
+        """Manager scans boards and dispatches work to workers via A2A.
+
+        Reserves workers synchronously (no two items can ever double-book the
+        same single-instance agent), then runs all reserved dispatches
+        concurrently — so distinct agents/stories genuinely progress in
+        parallel instead of queuing behind each other one at a time.
+        """
         board_data = await scan_board()
         active_agents = await get_active_agent_ids()
 
         work_by_board = group_by_board(board_data)
+        dispatches: list[tuple[str, str, dict]] = []
 
         for board_id, items in work_by_board.items():
             manager_id = await get_manager_for_board(board_id)
@@ -338,7 +349,16 @@ class ScrumSwarm:
                 if not claimed:
                     continue
 
-                await self.dispatch_one(manager_id, worker_id, work)
+                # Reserve immediately — before any concurrent execution starts —
+                # so a second item needing this same worker is correctly skipped above.
+                self._working_agents[worker_id] = work["work_key"]
+                dispatches.append((manager_id, worker_id, work))
+
+        if dispatches:
+            await asyncio.gather(*(
+                self.dispatch_one(manager_id, worker_id, work)
+                for manager_id, worker_id, work in dispatches
+            ))
 
     async def run_once(self) -> dict:
         """Run one iteration of the swarm — dispatch all pending work."""

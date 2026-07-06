@@ -38,8 +38,13 @@ async def test_create_story(client: AsyncClient, sample_story_data):
     assert data["acceptance_criteria"] == sample_story_data["acceptance_criteria"]
     assert data["priority"] == sample_story_data["priority"]
     assert data["board_id"] == board["id"]
-    # New stories land in the board's first column
-    assert data["status"] == board["columns"][0]["key"]
+    # Automated boards skip straight to the second column so the swarm picks the item up;
+    # non-automated boards land in the first column.
+    if board.get("agent_automation") and len(board["columns"]) > 1:
+        expected_status = board["columns"][1]["key"]
+    else:
+        expected_status = board["columns"][0]["key"]
+    assert data["status"] == expected_status
     assert data["id"] is not None
 
 
@@ -137,8 +142,12 @@ async def test_list_stories_by_status(client: AsyncClient, sample_story_data):
     """Test listing stories filtered by status."""
     board = await _get_default_board(client)
     story_data = {**sample_story_data, "board_id": board["id"]}
-    first_column = board["columns"][0]["key"]
-    second_column = board["columns"][1]["key"]
+    # Automated boards default new stories to the second column (see create_story route).
+    if board.get("agent_automation") and len(board["columns"]) > 1:
+        default_column = board["columns"][1]["key"]
+    else:
+        default_column = board["columns"][0]["key"]
+    next_column = board["columns"][2]["key"]
 
     # Create two stories with different statuses
     await client.post("/api/stories", json=story_data)
@@ -147,25 +156,25 @@ async def test_list_stories_by_status(client: AsyncClient, sample_story_data):
     create_response = await client.post("/api/stories", json=story2_data)
     story2_id = create_response.json()["id"]
 
-    # Transition one to the second column
+    # Transition one to the next column
     await client.post(
         f"/api/stories/{story2_id}/status",
-        json={"status": second_column}
+        json={"status": next_column}
     )
 
-    # Filter by first column
-    response = await client.get(f"/api/stories?status={first_column}")
+    # Filter by default column
+    response = await client.get(f"/api/stories?status={default_column}")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["status"] == first_column
+    assert data[0]["status"] == default_column
 
-    # Filter by second column
-    response = await client.get(f"/api/stories?status={second_column}")
+    # Filter by next column
+    response = await client.get(f"/api/stories?status={next_column}")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["status"] == second_column
+    assert data[0]["status"] == next_column
 
 
 @pytest.mark.asyncio

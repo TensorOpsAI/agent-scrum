@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import {
-  Bot, Plus, Settings, Users, AlertCircle, X, Sparkles, Key,
+  Plus, Settings, Users, AlertCircle, X, Sparkles, Key, TrendingUp,
   Play, Square, Pause, Loader2,
 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import { PRDInputModal } from './modals/PRDInputModal';
 import { SettingsModal } from './modals/SettingsModal';
 import { PipelineModal } from './modals/PipelineModal';
+import { TrendingNewsModal } from './modals/TrendingNewsModal';
 import { WelcomeModal, isOnboardingComplete } from './modals/WelcomeModal';
 import { AgentPanel } from './agents/AgentPanel';
 import { AgentManager } from './agents/AgentManager';
@@ -24,6 +25,7 @@ export function Layout() {
   const closePRDModal = useUIStore((s) => s.closePRDModal);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
+  const [isTrendingModalOpen, setIsTrendingModalOpen] = useState(false);
   const [isAgentManagerOpen, setIsAgentManagerOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(!isOnboardingComplete());
   const [hasApiKey, setHasApiKey] = useState(!!settingsApi.getLocalApiKey());
@@ -89,8 +91,8 @@ export function Layout() {
   }, [addError]);
 
   const automationEnabled = currentBoard?.agent_automation === true;
-  const itemNoun = currentBoard?.item_noun ?? 'Story';
-  const inputNoun = currentBoard?.input_noun ?? 'PRD';
+  const itemNoun = currentBoard?.item_noun ?? 'Artículo';
+  const inputNoun = currentBoard?.input_noun ?? 'Brief';
   const isExternalSource = currentBoard?.item_source === 'external';
 
   const handleAddItem = async () => {
@@ -107,7 +109,7 @@ export function Layout() {
       fetchStories(currentBoardId);
     } catch (error) {
       console.error('Error creating item:', error);
-      setAddError('Failed to create item. Is the backend running?');
+      setAddError('No se pudo crear el elemento. ¿Está el backend en ejecución?');
     } finally {
       setIsAdding(false);
     }
@@ -117,7 +119,7 @@ export function Layout() {
     e.stopPropagation();
     const board = boards.find((b) => b.id === boardId);
     if (!board) return;
-    if (!confirm(`Delete board "${board.name}"? All its stories will be permanently deleted.`)) return;
+    if (!confirm(`¿Eliminar el tablero "${board.name}"? Se eliminarán permanentemente todos sus elementos.`)) return;
     await deleteBoard(boardId);
     const newCurrentId = usePipelineStore.getState().currentBoardId;
     if (newCurrentId) fetchStories(newCurrentId);
@@ -132,7 +134,7 @@ export function Layout() {
       fetchStories(currentBoardId);
     } catch (error) {
       console.error('Error simulating items:', error);
-      setAddError('Failed to simulate items.');
+      setAddError('No se pudieron generar los elementos.');
     } finally {
       setIsSimulating(false);
     }
@@ -146,10 +148,7 @@ export function Layout() {
           {/* Brand + Boards */}
           <div className="flex items-center gap-4 min-w-0">
             <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm shadow-blue-500/20">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-semibold tracking-tight text-foreground">Agent Scrum</span>
+              <img src="/el-pais-logo.svg" alt="El País" className="h-5 w-auto" />
             </div>
 
             <div className="h-6 w-px bg-border" />
@@ -187,16 +186,26 @@ export function Layout() {
               <button
                 onClick={() => setIsPipelineModalOpen(true)}
                 className="flex items-center gap-1 h-8 px-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors whitespace-nowrap"
-                title="New Board"
+                title="Nuevo tablero"
               >
                 <Plus className="w-3.5 h-3.5" />
-                New
+                Nuevo
               </button>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2 relative flex-shrink-0">
+            {automationEnabled && (
+              <button
+                onClick={() => setIsTrendingModalOpen(true)}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-secondary hover:bg-accent text-foreground transition-colors"
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                Tendencias
+              </button>
+            )}
+
             {/* Swarm */}
             {automationEnabled && (
               <div className="flex items-center gap-1.5">
@@ -207,7 +216,7 @@ export function Layout() {
                     className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
                   >
                     {isSwarmLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                    Start swarm
+                    Iniciar automatización
                   </button>
                 ) : (
                   <>
@@ -221,24 +230,24 @@ export function Layout() {
                         'status-dot',
                         swarmStatus === 'running' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                       )} />
-                      {swarmStatus === 'running' ? 'Running' : 'Paused'}
+                      {swarmStatus === 'running' ? 'En ejecución' : 'Pausado'}
                     </div>
                     {swarmStatus === 'paused' ? (
                       <button onClick={() => handleSwarmAction('resume')} disabled={isSwarmLoading}
                         className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
-                        title="Resume">
+                        title="Reanudar">
                         {isSwarmLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                       </button>
                     ) : (
                       <button onClick={() => handleSwarmAction('pause')} disabled={isSwarmLoading}
                         className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-secondary hover:bg-accent text-foreground disabled:opacity-50 transition-colors"
-                        title="Pause">
+                        title="Pausar">
                         {isSwarmLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
                       </button>
                     )}
                     <button onClick={() => handleSwarmAction('stop')} disabled={isSwarmLoading}
                       className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-secondary hover:bg-destructive/80 text-foreground hover:text-white disabled:opacity-50 transition-colors"
-                      title="Stop">
+                      title="Detener">
                       <Square className="w-3.5 h-3.5" />
                     </button>
                   </>
@@ -252,7 +261,7 @@ export function Layout() {
               <button
                 onClick={() => setIsAgentManagerOpen(true)}
                 className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                title="Manage agents"
+                title="Gestionar agentes"
               >
                 <Users className="w-4 h-4" />
               </button>
@@ -261,7 +270,7 @@ export function Layout() {
             <button
               onClick={() => setIsSettingsModalOpen(true)}
               className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Settings"
+              title="Configuración"
             >
               <Settings className="w-4 h-4" />
             </button>
@@ -270,10 +279,10 @@ export function Layout() {
               <button
                 onClick={handleSimulate}
                 disabled={isSimulating}
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white transition-colors"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                {isSimulating ? 'Generating…' : currentBoard?.template_id === 'publisher' ? `Generate ${itemNoun}s` : `Simulate ${itemNoun}s`}
+                {isSimulating ? 'Generando…' : currentBoard?.template_id === 'publisher' ? `Generar ${itemNoun}s` : `Simular ${itemNoun}s`}
               </button>
             )}
 
@@ -288,7 +297,7 @@ export function Layout() {
                 )}
               >
                 <Plus className="w-3.5 h-3.5" />
-                Submit {inputNoun}
+                Enviar {inputNoun}
               </button>
             ) : !automationEnabled ? (
               <button
@@ -297,7 +306,7 @@ export function Layout() {
                 className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                {isAdding ? 'Adding…' : `Add ${itemNoun}`}
+                {isAdding ? 'Añadiendo…' : `Añadir ${itemNoun}`}
               </button>
             ) : null}
 
@@ -313,21 +322,21 @@ export function Layout() {
 
       {/* API Key banner */}
       {!hasApiKey && (
-        <div className="flex-shrink-0 border-b border-amber-500/20 bg-amber-500/5">
+        <div className="flex-shrink-0 border-b border-primary/20 bg-primary/5">
           <div className="px-5 py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-amber-300/90 text-sm">
+            <div className="flex items-center gap-2 text-primary/90 text-sm">
               <Key className="w-3.5 h-3.5 flex-shrink-0" />
               <span>
-                <span className="font-medium text-amber-200">No API key configured.</span>
-                <span className="text-amber-300/70"> Agents won't be able to process items without a Gemini API key.</span>
+                <span className="font-medium text-primary">No hay clave API configurada.</span>
+                <span className="text-primary/70"> Los agentes no podrán procesar elementos sin una clave API.</span>
               </span>
             </div>
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-medium border border-amber-500/30 hover:bg-amber-500/10 text-amber-200 rounded-md transition-colors"
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-medium border border-primary/30 hover:bg-primary/10 text-primary rounded-md transition-colors"
             >
               <Settings className="w-3 h-3" />
-              Open settings
+              Abrir configuración
             </button>
           </div>
         </div>
@@ -355,6 +364,7 @@ export function Layout() {
       <PRDInputModal isOpen={isPRDModalOpen} onClose={closePRDModal} />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
       <PipelineModal isOpen={isPipelineModalOpen} onClose={() => setIsPipelineModalOpen(false)} />
+      <TrendingNewsModal isOpen={isTrendingModalOpen} onClose={() => setIsTrendingModalOpen(false)} />
 
       {selectedStoryId && (
         <StoryDetail storyId={selectedStoryId} onClose={() => setSelectedStory(null)} />
@@ -373,7 +383,7 @@ export function Layout() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="surface shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h2 className="text-base font-semibold text-foreground">Agent manager</h2>
+              <h2 className="text-base font-semibold text-foreground">Gestor de agentes</h2>
               <button
                 onClick={() => setIsAgentManagerOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"

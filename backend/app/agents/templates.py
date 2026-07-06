@@ -222,8 +222,8 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
     },
 
     "news_curator": {
-        "name": "News Curator",
-        "description": "Scans news sources, trending topics, and RSS feeds to identify newsworthy items for coverage. Selects stories with high reader interest potential.",
+        "name": "Curador de Noticias",
+        "description": "Explora fuentes de noticias, temas de tendencia y feeds RSS para identificar elementos de interés para su cobertura. Selecciona historias con alto potencial de interés para el lector.",
         "default_tools": ["rss_reader", "trend_analyzer"],
         "skills": [
             {
@@ -256,8 +256,8 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
     },
 
     "journalist": {
-        "name": "Journalist",
-        "description": "Writes articles from curated news items, conducting research, structuring content, and producing publishable pieces that meet editorial standards.",
+        "name": "Periodista",
+        "description": "Redacta artículos a partir de las noticias seleccionadas, investigando, estructurando el contenido y produciendo piezas listas para publicar que cumplen con los estándares editoriales.",
         "default_tools": ["article_writer", "fact_checker"],
         "skills": [
             {
@@ -291,7 +291,7 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
 
     "editor": {
         "name": "Editor",
-        "description": "Reviews articles for quality, accuracy, tone, and adherence to editorial standards. Ensures content is publication-ready.",
+        "description": "Revisa los artículos en cuanto a calidad, precisión, tono y cumplimiento de los estándares editoriales. Se asegura de que el contenido esté listo para publicar.",
         "default_tools": ["grammar_checker", "plagiarism_detector"],
         "skills": [
             {
@@ -324,8 +324,8 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
     },
 
     "creative_director": {
-        "name": "Creative Director",
-        "description": "Selects or generates visuals, thumbnails, and creatives for articles. Ensures visual assets match content tone and brand guidelines.",
+        "name": "Director Creativo",
+        "description": "Selecciona o genera imágenes, miniaturas y elementos creativos para los artículos. Se asegura de que los recursos visuales encajen con el tono del contenido y las directrices de marca.",
         "default_tools": ["image_generator", "asset_library"],
         "skills": [
             {
@@ -358,8 +358,8 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
     },
 
     "publisher_agent": {
-        "name": "Publisher",
-        "description": "Formats and publishes final content to CMS platforms, manages the publication schedule, and optimizes for SEO.",
+        "name": "Publicador",
+        "description": "Da formato y publica el contenido final en plataformas CMS, gestiona el calendario de publicación y optimiza para SEO.",
         "default_tools": ["cms_connector", "seo_optimizer"],
         "skills": [
             {
@@ -392,8 +392,8 @@ AGENT_TEMPLATES: dict[str, AgentTemplate] = {
     },
 
     "editor_in_chief": {
-        "name": "Editor-in-Chief",
-        "description": "Oversees the editorial pipeline, assigns stories to journalists, manages priorities, and ensures consistent content quality across all publications.",
+        "name": "Redactor Jefe",
+        "description": "Supervisa el flujo editorial, asigna artículos a los periodistas, gestiona prioridades y garantiza una calidad de contenido consistente en todas las publicaciones.",
         "default_tools": ["editorial_dashboard"],
         "skills": [
             {

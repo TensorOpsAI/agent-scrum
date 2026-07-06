@@ -148,15 +148,15 @@ export const TASK_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   pending_review: 'Pending Review',
   ready_for_development: 'Ready for Dev',
-  in_progress: 'In Progress',
+  in_progress: 'En progreso',
   code_review: 'Code Review',
   ready_for_qa: 'Ready for QA',
   qa_in_progress: 'QA In Progress',
-  done: 'Done',
+  done: 'Hecho',
   // Non-dev statuses
-  pending: 'Pending',
+  pending: 'Pendiente',
   scheduled: 'Scheduled',
-  review: 'Review',
+  review: 'Revisión',
   identified: 'Identified',
   verified: 'Verified',
 };
@@ -166,13 +166,20 @@ export function getSubItemStatusLabel(status: string): string {
   return TASK_STATUS_LABELS[status] ?? status.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export const AGENT_LABELS: Record<BuiltinAgentType, string> = {
+export const AGENT_LABELS: Record<string, string> = {
   product_owner: 'Product Owner',
   tech_lead: 'Tech Lead',
   developer: 'Developer',
   code_reviewer: 'Code Reviewer',
   qa: 'QA',
   client: 'Human',
+  // Publisher template roles
+  news_curator: 'Curador de Noticias',
+  journalist: 'Periodista',
+  editor: 'Editor',
+  creative_director: 'Director Creativo',
+  publisher_agent: 'Publicador',
+  editor_in_chief: 'Redactor Jefe',
 };
 
 export const AGENT_COLORS: Record<BuiltinAgentType, string> = {
@@ -187,7 +194,7 @@ export const AGENT_COLORS: Record<BuiltinAgentType, string> = {
 // Helper functions for dynamic agents
 export function getAgentLabel(type: AgentType, name?: string): string {
   if (type in AGENT_LABELS) {
-    return AGENT_LABELS[type as BuiltinAgentType];
+    return AGENT_LABELS[type];
   }
   // For dynamic agents, use the name or format the type
   return name || type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

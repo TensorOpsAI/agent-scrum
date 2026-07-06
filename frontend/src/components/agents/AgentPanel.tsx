@@ -12,6 +12,12 @@ interface AgentCardProps {
   onClick: () => void;
 }
 
+const STATUS_LABEL: Record<Agent['status'], string> = {
+  idle: 'inactivo',
+  working: 'trabajando',
+  waiting: 'esperando',
+};
+
 function AgentCard({ agent, onClick }: AgentCardProps) {
   const statusMeta = {
     idle:    { icon: <CheckCircle className="w-3 h-3" />, color: 'text-emerald-400', dot: 'bg-emerald-400' },
@@ -44,7 +50,7 @@ function AgentCard({ agent, onClick }: AgentCardProps) {
             {getAgentLabel(agent.type, agent.name)}
           </h3>
           <span className={cn('text-[10px] capitalize', meta.color)}>
-            {agent.status}
+            {STATUS_LABEL[agent.status]}
           </span>
         </div>
       </div>
@@ -67,7 +73,7 @@ export function AgentPanel() {
         <div className="flex items-center gap-2 mb-2.5">
           <Users className="w-3.5 h-3.5 text-muted-foreground" />
           <h2 className="font-medium text-foreground text-xs uppercase tracking-[0.08em]">
-            Agents
+            Agentes
           </h2>
           <span className="text-[10px] text-muted-foreground tabular-nums ml-auto">
             {agents.length}

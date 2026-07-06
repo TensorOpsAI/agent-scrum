@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  X, Loader2, Bot, Users, Newspaper, Code2, UserPlus, BarChart3, Shield,
+  X, Loader2, Bot, Users, Newspaper,
   ArrowRight, Sparkles,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -22,33 +22,9 @@ const TEMPLATE_META: Record<string, {
 }> = {
   publisher: {
     icon: Newspaper,
-    tagline: 'AI editorial team',
-    description: 'Curators source briefs, journalists draft articles, and an editor reviews before publishing.',
+    tagline: 'Equipo editorial de IA',
+    description: 'Los curadores seleccionan briefs, los periodistas redactan artículos y un editor los revisa antes de publicar.',
     accent: 'from-pink-500/20 to-rose-500/10 text-pink-300',
-  },
-  software_dev: {
-    icon: Code2,
-    tagline: 'AI engineering squad',
-    description: 'PO breaks PRDs into stories, devs write code, reviewers check it, QA verifies before done.',
-    accent: 'from-blue-500/20 to-indigo-500/10 text-blue-300',
-  },
-  talent_acquisition: {
-    icon: UserPlus,
-    tagline: 'AI recruiting team',
-    description: 'Sources sources candidates, recruiters screen, and hiring managers interview through to offer.',
-    accent: 'from-violet-500/20 to-purple-500/10 text-violet-300',
-  },
-  sales: {
-    icon: BarChart3,
-    tagline: 'AI sales pod',
-    description: 'Lead gen qualifies prospects, AEs build proposals, and contracts handle close.',
-    accent: 'from-amber-500/20 to-orange-500/10 text-amber-300',
-  },
-  ciso: {
-    icon: Shield,
-    tagline: 'AI security ops',
-    description: 'Threat analysts triage incidents, engineers mitigate, compliance verifies resolution.',
-    accent: 'from-red-500/20 to-rose-500/10 text-red-300',
   },
 };
 
@@ -91,7 +67,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
   if (selectedTemplate) {
     const meta = TEMPLATE_META[selectedTemplate.template_id] ?? {
       icon: Bot,
-      tagline: 'AI workflow',
+      tagline: 'Flujo de trabajo con IA',
       description: '',
       accent: 'from-blue-500/20 to-indigo-500/10 text-blue-300',
     };
@@ -109,10 +85,10 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
                 onClick={() => setSelectedTemplate(null)}
                 className="text-muted-foreground hover:text-foreground text-sm"
               >
-                ← Back
+                ← Atrás
               </button>
               <span className="text-muted-foreground/40">/</span>
-              <h2 className="text-sm font-medium text-foreground">Configure board</h2>
+              <h2 className="text-sm font-medium text-foreground">Configurar tablero</h2>
             </div>
             <button
               onClick={onClose}
@@ -142,7 +118,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
             {/* Pipeline preview */}
             <div>
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2 block">
-                Pipeline
+                Flujo
               </label>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {selectedTemplate.columns.map((col, i) => (
@@ -162,7 +138,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
             {/* Board name */}
             <div>
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2 block">
-                Board name
+                Nombre del tablero
               </label>
               <input
                 type="text"
@@ -182,7 +158,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
               onClick={() => setSelectedTemplate(null)}
               className="btn-ghost"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               onClick={handleCreate}
@@ -190,7 +166,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
               className="btn-primary"
             >
               {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              Create board
+              Crear tablero
             </button>
           </div>
         </div>
@@ -207,8 +183,8 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 h-14 border-b border-border shrink-0">
           <div>
-            <h2 className="text-sm font-medium text-foreground">New board</h2>
-            <p className="text-[11px] text-muted-foreground -mt-0.5">Pick a workflow to get started</p>
+            <h2 className="text-sm font-medium text-foreground">Nuevo tablero</h2>
+            <p className="text-[11px] text-muted-foreground -mt-0.5">Elige un flujo de trabajo para empezar</p>
           </div>
           <button
             onClick={onClose}
@@ -224,7 +200,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
             {templates.map((template) => {
               const meta = TEMPLATE_META[template.template_id] ?? {
                 icon: Bot,
-                tagline: 'AI workflow',
+                tagline: 'Flujo de trabajo con IA',
                 description: '',
                 accent: 'from-zinc-500/20 to-zinc-500/10 text-zinc-300',
               };
@@ -248,7 +224,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
                     </div>
                     <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
                       {template.agent_automation ? (
-                        <><Bot className="w-3 h-3" /> Auto</>
+                        <><Bot className="w-3 h-3" /> Automático</>
                       ) : (
                         <><Users className="w-3 h-3" /> Manual</>
                       )}
@@ -272,7 +248,7 @@ export function PipelineModal({ isOpen, onClose }: PipelineModalProps) {
                       />
                     ))}
                     <span className="text-[10px] text-muted-foreground/60 ml-1.5">
-                      {template.columns.length} stages · {pluralize(template.item_noun)}
+                      {template.columns.length} etapas · {pluralize(template.item_noun)}
                     </span>
                   </div>
                 </button>

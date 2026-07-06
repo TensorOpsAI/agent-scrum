@@ -229,21 +229,21 @@ export function ChatPanel() {
           <Filter className="w-3 h-3 text-primary flex-shrink-0" />
           <span className="text-[11px] text-foreground/90 flex-1 truncate">
             {filterByStory ? (
-              <>Filtered to <span className="font-mono text-primary">STORY-{selectedStoryId}</span></>
+              <>Filtrado a <span className="font-mono text-primary">STORY-{selectedStoryId}</span></>
             ) : (
-              <>Showing all messages</>
+              <>Mostrando todos los mensajes</>
             )}
           </span>
           <button
             onClick={() => setFilterByStory((v) => !v)}
             className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            {filterByStory ? 'show all' : 'filter'}
+            {filterByStory ? 'mostrar todo' : 'filtrar'}
           </button>
           <button
             onClick={() => setSelectedStory(null)}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            title="Deselect story"
+            title="Deseleccionar artículo"
           >
             <XIcon className="w-3 h-3" />
           </button>
@@ -260,12 +260,12 @@ export function ChatPanel() {
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground/60 px-6 text-center">
             <MessageSquare className="w-7 h-7 mb-2 opacity-50" />
             <p className="text-xs font-medium text-muted-foreground">
-              {selectedStoryId && filterByStory ? 'No messages for this story yet' : 'No messages yet'}
+              {selectedStoryId && filterByStory ? 'Aún no hay mensajes para este artículo' : 'Aún no hay mensajes'}
             </p>
             <p className="text-[11px] mt-0.5">
               {selectedStoryId && filterByStory
-                ? 'Agents will post here as they work on it'
-                : 'Submit a PRD to see agents collaborate'}
+                ? 'Los agentes publicarán aquí mientras trabajan en él'
+                : 'Envía un brief para ver a los agentes colaborar'}
             </p>
           </div>
         ) : (
@@ -283,7 +283,7 @@ export function ChatPanel() {
         {showAgentSelector && (
           <div className="mb-2 surface overflow-hidden animate-fade-in">
             <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-              Select agent
+              Seleccionar agente
             </div>
             {availableAgents.map((agent) => (
               <button
@@ -303,7 +303,7 @@ export function ChatPanel() {
 
         {targetAgent && !showAgentSelector && (
           <div className="mb-2 flex items-center gap-2 animate-fade-in">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">To</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Para</span>
             <span className={cn(
               'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium ring-1',
               getAgentBgColor(targetAgent),
@@ -328,7 +328,7 @@ export function ChatPanel() {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message…  use @ to mention"
+            placeholder="Escribe un mensaje… usa @ para mencionar"
             disabled={isSending}
             className={cn(
               'flex-1 h-9 px-3 bg-input border border-border rounded-md',
@@ -350,7 +350,7 @@ export function ChatPanel() {
           </button>
         </div>
         <p className="mt-1.5 text-[10px] text-muted-foreground/60">
-          Enter to send · @ to mention an agent
+          Enter para enviar · @ para mencionar a un agente
         </p>
       </div>
     </div>

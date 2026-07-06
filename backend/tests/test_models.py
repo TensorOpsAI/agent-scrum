@@ -196,7 +196,7 @@ async def test_board_cascade_delete(test_session: AsyncSession):
     """Test that deleting a board cascades to its stories."""
     from app.pipeline.templates import get_template_by_id
 
-    template = get_template_by_id("software_dev")
+    template = get_template_by_id("publisher")
     board = PipelineConfig(
         template_id=template["template_id"],
         name="Temp Board",
@@ -275,7 +275,7 @@ async def test_board_cascade_deletes_agents(test_session: AsyncSession):
     from app.pipeline.templates import get_template_by_id
     from sqlalchemy import select
 
-    template = get_template_by_id("software_dev")
+    template = get_template_by_id("publisher")
     board = PipelineConfig(
         template_id=template["template_id"],
         name="Temp Board for Agent Cascade",

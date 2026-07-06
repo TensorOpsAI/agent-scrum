@@ -1,8 +1,10 @@
-import { CheckCircle2, Circle, FileText } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Circle, FileText, Eye } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Story } from '../../types';
 import { getStatusLabel, getStatusColor } from '../../types';
 import { usePipelineStore } from '../../store/pipelineStore';
+import { ArticlePreviewModal } from '../modals/ArticlePreviewModal';
 
 interface StoryCardProps {
   story: Story;
@@ -13,6 +15,7 @@ interface StoryCardProps {
 
 export function StoryCard({ story, isSelected, isActive, onClick }: StoryCardProps) {
   const columns = usePipelineStore((s) => s.activeConfig?.columns ?? []);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const progress =
     story.task_count > 0
@@ -20,12 +23,16 @@ export function StoryCard({ story, isSelected, isActive, onClick }: StoryCardPro
       : 0;
 
   const dotColor = getStatusColor(story.status, columns);
+  const isPublished = story.status === 'published';
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
       className={cn(
-        'group relative w-full text-left rounded-lg p-3 transition-all',
+        'group relative w-full text-left rounded-lg p-3 transition-all cursor-pointer',
         'bg-card border border-border/80 hover:border-border',
         'hover:bg-accent/40 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20',
         isSelected && 'border-primary/60 bg-accent/40 ring-1 ring-primary/40',
@@ -38,7 +45,7 @@ export function StoryCard({ story, isSelected, isActive, onClick }: StoryCardPro
           className="absolute -top-1 -right-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-primary text-primary-foreground shadow-md animate-fade-in"
         >
           <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-          live
+          en vivo
         </span>
       )}
       <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -62,7 +69,18 @@ export function StoryCard({ story, isSelected, isActive, onClick }: StoryCardPro
           {getStatusLabel(story.status, columns)}
         </span>
 
-        {story.task_count > 0 ? (
+        {isPublished ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPreviewOpen(true);
+            }}
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Vista previa
+          </button>
+        ) : story.task_count > 0 ? (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               {story.completed_task_count === story.task_count ? (
@@ -84,10 +102,18 @@ export function StoryCard({ story, isSelected, isActive, onClick }: StoryCardPro
         ) : (
           <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60">
             <FileText className="w-3 h-3" />
-            empty
+            vacío
           </span>
         )}
       </div>
-    </button>
+
+      {isPublished && (
+        <ArticlePreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          story={story}
+        />
+      )}
+    </div>
   );
 }

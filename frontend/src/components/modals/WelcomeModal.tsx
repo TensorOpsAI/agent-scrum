@@ -22,47 +22,47 @@ interface WelcomeModalProps {
 const steps = [
   {
     icon: Bot,
-    title: 'Welcome to Agent Scrum',
+    title: 'Bienvenido a la redacción con IA',
     description:
-      'Agent Scrum is an AI-powered project management tool where autonomous agents collaborate to break down, plan, and manage your work items.',
+      'Un equipo de agentes de IA colabora para investigar, redactar, editar y publicar artículos de forma autónoma.',
     details: [
-      'Create boards for different workflows (Scrum, CISO, HR, etc.)',
-      'AI agents automatically process and manage your items',
-      'Watch agents collaborate in real-time via the chat panel',
+      'El tablero organiza el flujo editorial de principio a fin',
+      'Los agentes de IA procesan y gestionan los artículos automáticamente',
+      'Observa a los agentes colaborar en tiempo real en el panel de chat',
     ],
   },
   {
     icon: Key,
-    title: 'Set Up Your API Key',
+    title: 'Configura tu clave API',
     description:
-      'To use live AI agents, you need a Gemini API key. Without it, the agents won\'t be able to process your items.',
+      'Para usar agentes de IA en directo, necesitas una clave API. Sin ella, los agentes no podrán procesar tus artículos.',
     details: [
-      'Go to Settings (gear icon in the top right)',
-      'Paste your Gemini API key and click Save',
-      'Or use Simulation Mode to try the app with mock responses',
+      'Ve a Configuración (icono de engranaje arriba a la derecha)',
+      'Pega tu clave API y haz clic en Guardar',
+      'O usa el Modo Simulación para probar la app con respuestas de ejemplo',
     ],
     action: 'apiKey',
   },
   {
     icon: Layout,
-    title: 'Create Your First Board',
+    title: 'Crea tu primer tablero',
     description:
-      'Boards are workspaces tailored to specific workflows. Each board type comes with its own columns, agents, and automation rules.',
+      'El tablero editorial trae sus propias columnas, agentes y reglas de automatización ya configuradas.',
     details: [
-      'Click "New Board" in the header to get started',
-      'Choose a template: Scrum, CISO, HR, and more',
-      'Each template has pre-configured agents and workflow stages',
+      'Haz clic en "Nuevo tablero" en la cabecera para empezar',
+      'Elige la plantilla de Redacción',
+      'Incluye agentes preconfigurados para cada etapa del flujo editorial',
     ],
   },
   {
     icon: Rocket,
-    title: 'You\'re All Set!',
+    title: '¡Todo listo!',
     description:
-      'Submit work items and watch your AI agent team spring into action. Here are a few tips to get the most out of Agent Scrum:',
+      'Envía un brief de noticias y observa a tu equipo de agentes de IA ponerse en marcha. Algunos consejos para sacarle el máximo partido:',
     details: [
-      'Use the @ mention in chat to direct messages to specific agents',
-      'Click on any agent card to see its role and current activity',
-      'Open the Agent Manager to customize your team\'s composition',
+      'Usa @ en el chat para dirigir mensajes a agentes concretos',
+      'Haz clic en cualquier tarjeta de agente para ver su rol y actividad actual',
+      'Abre el Gestor de agentes para personalizar la composición de tu equipo',
     ],
   },
 ];
@@ -107,7 +107,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70" />
 
-      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Progress bar */}
         <div className="flex gap-1 px-6 pt-4">
           {steps.map((_, i) => (
@@ -115,7 +115,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
               key={i}
               className={clsx(
                 'h-1 flex-1 rounded-full transition-colors',
-                i <= currentStep ? 'bg-blue-500' : 'bg-gray-700'
+                i <= currentStep ? 'bg-primary' : 'bg-gray-200'
               )}
             />
           ))}
@@ -124,18 +124,18 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
         {/* Content */}
         <div className="px-6 py-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-600/20 flex items-center justify-center">
-              <Icon className="w-5 h-5 text-blue-400" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Icon className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-xl font-bold text-white">{step.title}</h2>
+            <h2 className="text-xl font-bold text-gray-900">{step.title}</h2>
           </div>
 
-          <p className="text-gray-300 text-sm mb-4">{step.description}</p>
+          <p className="text-gray-600 text-sm mb-4">{step.description}</p>
 
           <ul className="space-y-2 mb-6">
             {step.details.map((detail, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                <Sparkles className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+              <li key={i} className="flex items-start gap-2 text-sm text-gray-500">
+                <Sparkles className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                 {detail}
               </li>
             ))}
@@ -143,11 +143,11 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
 
           {/* API Key inline form on step 2 */}
           {step.action === 'apiKey' && (
-            <div className="bg-gray-900 rounded-lg p-4 mb-2">
+            <div className="bg-gray-50 rounded-lg p-4 mb-2">
               {apiKeySaved ? (
-                <div className="flex items-center gap-2 text-green-400 text-sm">
+                <div className="flex items-center gap-2 text-emerald-600 text-sm">
                   <Key className="w-4 h-4" />
-                  API key saved! You can always change it in Settings later.
+                  ¡Clave API guardada! Puedes cambiarla más tarde en Configuración.
                 </div>
               ) : (
                 <>
@@ -156,8 +156,8 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Paste your Gemini API key..."
-                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Paste your API key..."
+                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       onKeyDown={(e) => { if (e.key === 'Enter') handleSaveApiKey(); }}
                     />
                     <button
@@ -166,29 +166,29 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
                       className={clsx(
                         'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
                         apiKey.trim()
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          ? 'bg-primary hover:bg-primary/90 text-white'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       )}
                     >
-                      Save
+                      Guardar
                     </button>
                   </div>
                   <p className="text-xs text-gray-500">
-                    Get your free key from{' '}
+                    Consigue tu clave gratuita en{' '}
                     <a
                       href="https://aistudio.google.com/apikey"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline inline-flex items-center gap-1"
+                      className="text-primary hover:underline inline-flex items-center gap-1"
                     >
                       Google AI Studio <ExternalLink className="w-3 h-3" />
                     </a>
                     {' '}&middot;{' '}
                     <button
                       onClick={onOpenSettings}
-                      className="text-blue-400 hover:underline"
+                      className="text-primary hover:underline"
                     >
-                      or configure in Settings
+                      o configúrala en Configuración
                     </button>
                   </p>
                 </>
@@ -198,29 +198,29 @@ export function WelcomeModal({ isOpen, onClose, onOpenSettings }: WelcomeModalPr
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700 bg-gray-850">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
           <button
             onClick={handleSkip}
-            className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
           >
-            Skip walkthrough
+            Saltar introducción
           </button>
 
           <div className="flex items-center gap-2">
             {currentStep > 0 && (
               <button
                 onClick={handleBack}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
-                Back
+                Atrás
               </button>
             )}
             <button
               onClick={handleNext}
-              className="flex items-center gap-1 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="flex items-center gap-1 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors"
             >
-              {isLastStep ? 'Get Started' : 'Next'}
+              {isLastStep ? 'Empezar' : 'Siguiente'}
               {!isLastStep && <ChevronRight className="w-4 h-4" />}
             </button>
           </div>

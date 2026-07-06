@@ -88,7 +88,9 @@ class SimulatedAgent:
         """Simulate agent invocation with mock tool calls."""
         logger.info(f"[SIMULATED:{self.agent_id}] ainvoke called")
         messages = input_data.get("messages", [])
-        self._context = input_data.get("context", {})
+        # Local, not self._context — this agent instance is shared across concurrent
+        # invocations (one per role), so context must never live on shared state.
+        context = input_data.get("context", {})
         if not messages:
             logger.warning(f"[SIMULATED:{self.agent_id}] No messages provided")
             return {"messages": [AIMessage(content="No input provided.")]}
@@ -130,7 +132,7 @@ class SimulatedAgent:
 
             logger.info(f"[SIMULATED:{self.agent_id}] Processing PRD content, will create stories")
             # This looks like a PRD - parse it and create stories
-            board_id = self._context.get("board_id")
+            board_id = context.get("board_id")
             stories_created = await self._parse_prd_and_create_stories(last_message, board_id=board_id)
             response_content = f"Analyzed PRD and created {stories_created} user stories."
             response_messages.append(AIMessage(content=response_content))
@@ -158,7 +160,7 @@ class SimulatedAgent:
                 return {"messages": response_messages}
 
             logger.info(f"[SIMULATED:{self.agent_id}] Processing news brief, will create articles")
-            board_id = self._context.get("board_id")
+            board_id = context.get("board_id")
             articles_created = await self._parse_news_brief_and_create_articles(last_message, board_id=board_id)
             response_content = f"Analyzed news brief and created {articles_created} articles for coverage."
             response_messages.append(AIMessage(content=response_content))
@@ -225,7 +227,7 @@ class SimulatedAgent:
 
         # Domain agent simulation - parse role from agent_id and look up simulation text
         role, board_id = _parse_agent_id(self.agent_id)
-        response_content = await self._domain_simulation(role, board_id, last_message)
+        response_content = await self._domain_simulation(role, board_id, last_message, context)
         response_messages.append(AIMessage(content=response_content))
         return {"messages": response_messages}
 
@@ -563,7 +565,7 @@ class SimulatedAgent:
             if clean_content:
                 articles = [clean_content]
             else:
-                articles = ["Cover the developments from the news brief"]
+                articles = ["Cubrir las novedades del brief de noticias"]
 
         # Deduplicate and limit
         seen = set()
@@ -579,11 +581,11 @@ class SimulatedAgent:
         # Derive additional article angles if we have few
         if len(articles) < 5 and len(articles) > 0:
             derived = [
-                f"Analysis: Impact and implications of {articles[0][:60]}",
-                f"Opinion: What {articles[0][:60]} means for the industry",
-                f"Timeline: Key milestones leading to {articles[0][:60]}",
-                "Expert roundup: Industry leaders weigh in",
-                "What to watch: Upcoming developments to follow",
+                f"Análisis: impacto e implicaciones de {articles[0][:60]}",
+                f"Opinión: qué significa {articles[0][:60]} para el sector",
+                f"Cronología: hitos clave que llevaron a {articles[0][:60]}",
+                "Voces expertas: líderes del sector opinan",
+                "Qué vigilar: próximas novedades a seguir",
             ]
             for d in derived:
                 if len(articles) >= 8:
@@ -603,7 +605,7 @@ class SimulatedAgent:
                 epic_result = await create_epic.ainvoke({
                     "title": epic_title,
                     "board_id": board_id,
-                    "description": f"Auto-created from news brief ({len(articles)} articles)",
+                    "description": f"Creado automáticamente a partir del brief de noticias ({len(articles)} artículos)",
                 })
                 epic_id = epic_result.get("id")
                 logger.info(f"[SIMULATED:news_curator] Created topic #{epic_id}: {epic_title[:50]}")
@@ -617,8 +619,8 @@ class SimulatedAgent:
                 logger.info(f"[SIMULATED:news_curator] Creating article {i}: {title[:60]}...")
                 invoke_args = {
                     "title": title,
-                    "description": f"[From News Brief] {article_topic}",
-                    "acceptance_criteria": "- Article is factually accurate\n- Sources are cited\n- Tone matches editorial guidelines\n- Visuals are selected",
+                    "description": f"[Del brief de noticias] {article_topic}",
+                    "acceptance_criteria": "- El artículo es factualmente preciso\n- Se citan las fuentes\n- El tono cumple las directrices editoriales\n- Se han seleccionado los elementos visuales",
                     "priority": i,
                     "prd_content": brief_content[:500],
                 }
@@ -858,7 +860,7 @@ This task involves implementing the required functionality as specified.
             logger.error(f"[SIMULATED:qa] Error in QA test: {e}", exc_info=True)
             return True, ""
 
-    async def _domain_simulation(self, role: str, board_id: int | None, message: str) -> str:
+    async def _domain_simulation(self, role: str, board_id: int | None, message: str, context: dict) -> str:
         """Handle domain-specific agent simulation for non-software-dev boards.
 
         This is the functional version that actually moves items through the pipeline:
@@ -871,7 +873,6 @@ This task involves implementing the required functionality as specified.
         from app.pipeline.templates import TEMPLATE_WORKFLOWS
 
         # Get context from the swarm (story_id, task_id, action, board_id)
-        context = self._context or {}
         story_id = context.get("story_id")
         task_id = context.get("task_id")
         action = context.get("action")
@@ -1729,25 +1730,25 @@ def create_scrum_master_agent():
 DOMAIN_SIMULATIONS = {
     "publisher": {
         "news_curator": {
-            "curate": "Scanned 50+ news sources and trending topics. Identified 8 newsworthy items with high reader interest potential.",
+            "curate": "Se exploraron más de 50 fuentes de noticias y temas de tendencia. Se identificaron 8 elementos de interés con alto potencial para el lector.",
         },
         "journalist": {
-            "write_article": "Drafted article with headline, lede, body, and quotes. Word count: 1,200. Submitted for editorial review.",
-            "draft_section": "Drafted section with supporting details, data points, and source attributions. Ready for editor review.",
+            "write_article": "Se redactó el artículo con titular, entradilla, cuerpo y citas. Extensión: 1.200 palabras. Enviado para revisión editorial.",
+            "draft_section": "Se redactó la sección con detalles de apoyo, datos y atribución de fuentes. Lista para revisión del editor.",
         },
         "editor": {
-            "review_article": "Editorial review complete. Checked grammar, fact accuracy, tone consistency, and AP style compliance. Article approved.",
-            "review_section": "Section reviewed for clarity, accuracy, and style. Edits applied. Moving to creative assets.",
+            "review_article": "Revisión editorial completada. Se comprobaron gramática, precisión de los datos, consistencia del tono y cumplimiento del estilo editorial. Artículo aprobado.",
+            "review_section": "Sección revisada en cuanto a claridad, precisión y estilo. Ediciones aplicadas. Pasa a elementos creativos.",
         },
         "creative_director": {
-            "create_visuals": "Selected hero image, created thumbnail, and prepared social media graphics. All assets meet brand guidelines.",
-            "attach_media": "Attached relevant media assets to the section. Images optimized for web delivery.",
+            "create_visuals": "Se seleccionó la imagen principal, se creó la miniatura y se prepararon gráficos para redes sociales. Todos los elementos cumplen las directrices de marca.",
+            "attach_media": "Se adjuntaron los recursos multimedia relevantes a la sección. Imágenes optimizadas para la web.",
         },
         "publisher_agent": {
-            "publish": "Content formatted for CMS. SEO meta tags added. Scheduled for publication. Social media posts queued.",
+            "publish": "Contenido formateado para el CMS. Meta tags SEO añadidas. Programado para publicación. Publicaciones en redes sociales en cola.",
         },
         "editor_in_chief": {
-            "assign": "Reviewed incoming stories and assigned to journalists based on beat expertise and availability.",
+            "assign": "Se revisaron las historias entrantes y se asignaron a periodistas según su área de especialización y disponibilidad.",
         },
     },
     "software_dev": {

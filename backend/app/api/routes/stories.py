@@ -82,7 +82,12 @@ async def create_story(
     if not board:
         raise HTTPException(status_code=400, detail=f"Board {story_data.board_id} not found")
 
-    first_status = board.columns[0]["key"]
+    # Automated boards skip straight to the second column (e.g. "writing") so the
+    # swarm — which only watches statuses listed in TEMPLATE_WORKFLOWS — picks the item up.
+    if board.agent_automation and len(board.columns) > 1:
+        first_status = board.columns[1]["key"]
+    else:
+        first_status = board.columns[0]["key"]
 
     story = Story(
         board_id=story_data.board_id,

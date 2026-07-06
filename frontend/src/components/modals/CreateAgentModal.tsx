@@ -97,7 +97,7 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
 
   const handleSubmit = async () => {
     if (!formData.id || !formData.name) {
-      setError('Agent ID and name are required');
+      setError('El ID y el nombre del agente son obligatorios');
       return;
     }
 
@@ -117,7 +117,7 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
       const newAgent = await agentManagementApi.createAgent(request);
       onCreated(newAgent);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create agent';
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo crear el agente';
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -135,16 +135,16 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-white">Create New Agent</h2>
+            <Bot className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-gray-900">Crear nuevo agente</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white transition-colors"
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -153,7 +153,7 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {error && (
-            <div className="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg text-sm">
+            <div className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -161,8 +161,8 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
           {step === 'template' ? (
             <>
               <div>
-                <h3 className="text-sm font-medium text-gray-300 mb-3">
-                  Select a Template (Optional)
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Elige una plantilla (opcional)
                 </h3>
                 <div className="grid gap-2">
                   <button
@@ -172,12 +172,12 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
                     }}
                     className={clsx(
                       'text-left p-3 rounded-lg border transition-colors',
-                      'border-gray-700 hover:border-blue-500/50 hover:bg-gray-800'
+                      'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
                     )}
                   >
-                    <div className="font-medium text-white">Custom Agent</div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Start from scratch with your own configuration
+                    <div className="font-medium text-gray-900">Agente personalizado</div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Empieza desde cero con tu propia configuración
                     </p>
                   </button>
                   {templates.map((template) => (
@@ -190,24 +190,24 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
                       className={clsx(
                         'text-left p-3 rounded-lg border transition-colors',
                         selectedTemplate === template.id
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-gray-700 hover:border-blue-500/50 hover:bg-gray-800'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
                       )}
                     >
-                      <div className="font-medium text-white">{template.name}</div>
-                      <p className="text-xs text-gray-400 mt-1">{template.description}</p>
+                      <div className="font-medium text-gray-900">{template.name}</div>
+                      <p className="text-xs text-gray-500 mt-1">{template.description}</p>
                       <div className="flex gap-1 mt-2">
                         {template.default_tools.slice(0, 3).map((tool) => (
                           <span
                             key={tool}
-                            className="px-1.5 py-0.5 text-xs bg-gray-700 text-gray-300 rounded"
+                            className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded"
                           >
                             {tool.replace('_', ' ')}
                           </span>
                         ))}
                         {template.default_tools.length > 3 && (
-                          <span className="text-xs text-gray-500">
-                            +{template.default_tools.length - 3} more
+                          <span className="text-xs text-gray-400">
+                            +{template.default_tools.length - 3} más
                           </span>
                         )}
                       </div>
@@ -220,49 +220,49 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
             <>
               {/* Basic Info */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-300">Basic Information</h3>
+                <h3 className="text-sm font-medium text-gray-700">Información básica</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Agent ID</label>
+                    <label className="block text-xs text-gray-500 mb-1">ID del agente</label>
                     <input
                       type="text"
                       value={formData.id}
                       onChange={(e) => setFormData(prev => ({ ...prev, id: e.target.value }))}
-                      placeholder="e.g., security_analyst_1"
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      placeholder="ej., security_analyst_1"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Name</label>
+                    <label className="block text-xs text-gray-500 mb-1">Nombre</label>
                     <input
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="e.g., Security Analyst"
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      placeholder="ej., Analista de Seguridad"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Description</label>
+                  <label className="block text-xs text-gray-500 mb-1">Descripción</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="What does this agent do?"
+                    placeholder="¿Qué hace este agente?"
                     rows={2}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
 
               {/* Tools */}
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-300">
-                  Tools ({formData.tools.length} selected)
+                <h3 className="text-sm font-medium text-gray-700">
+                  Herramientas ({formData.tools.length} seleccionadas)
                 </h3>
                 {Object.entries(toolsByCategory).map(([category, categoryTools]) => (
                   <div key={category} className={clsx('p-3 rounded-lg border', CATEGORY_COLORS[category] || CATEGORY_COLORS.custom)}>
-                    <div className="text-xs font-medium text-gray-300 mb-2 capitalize">{category}</div>
+                    <div className="text-xs font-medium text-gray-600 mb-2 capitalize">{category}</div>
                     <div className="flex flex-wrap gap-2">
                       {categoryTools.map((tool) => (
                         <button
@@ -271,8 +271,8 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
                           className={clsx(
                             'px-2 py-1 text-xs rounded border transition-colors',
                             formData.tools.includes(tool.id)
-                              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                              : 'border-gray-600 bg-gray-800 text-gray-400 hover:border-gray-500'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-gray-300 bg-white text-gray-500 hover:border-gray-400'
                           )}
                           title={tool.description}
                         >
@@ -286,21 +286,21 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
 
               {/* Skills */}
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-300">
-                  Skills ({formData.skills.length})
+                <h3 className="text-sm font-medium text-gray-700">
+                  Habilidades ({formData.skills.length})
                 </h3>
                 {formData.skills.map((skill) => (
                   <div
                     key={skill.id}
-                    className="flex items-start justify-between p-2 bg-gray-800 rounded"
+                    className="flex items-start justify-between p-2 bg-gray-50 rounded"
                   >
                     <div>
-                      <div className="text-sm text-white">{skill.name}</div>
-                      <div className="text-xs text-gray-400">{skill.description}</div>
+                      <div className="text-sm text-gray-900">{skill.name}</div>
+                      <div className="text-xs text-gray-500">{skill.description}</div>
                     </div>
                     <button
                       onClick={() => handleRemoveSkill(skill.id)}
-                      className="p-1 text-red-400 hover:bg-red-500/20 rounded"
+                      className="p-1 text-red-500 hover:bg-red-50 rounded"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -308,38 +308,38 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
                 ))}
 
                 {/* Add new skill */}
-                <div className="p-3 bg-gray-800/50 rounded border border-gray-700">
-                  <div className="text-xs text-gray-400 mb-2">Add Custom Skill</div>
+                <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                  <div className="text-xs text-gray-500 mb-2">Añadir habilidad personalizada</div>
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <input
                       type="text"
                       value={newSkill.id}
                       onChange={(e) => setNewSkill(prev => ({ ...prev, id: e.target.value }))}
-                      placeholder="Skill ID"
-                      className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white"
+                      placeholder="ID de habilidad"
+                      className="px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900"
                     />
                     <input
                       type="text"
                       value={newSkill.name}
                       onChange={(e) => setNewSkill(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Skill Name"
-                      className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white"
+                      placeholder="Nombre de la habilidad"
+                      className="px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900"
                     />
                   </div>
                   <input
                     type="text"
                     value={newSkill.description}
                     onChange={(e) => setNewSkill(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Description"
-                    className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white mb-2"
+                    placeholder="Descripción"
+                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-900 mb-2"
                   />
                   <button
                     onClick={handleAddSkill}
                     disabled={!newSkill.id || !newSkill.name}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-900 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-3 h-3" />
-                    Add Skill
+                    Añadir habilidad
                   </button>
                 </div>
               </div>
@@ -348,30 +348,30 @@ export function CreateAgentModal({ templates, tools, onClose, onCreated }: Creat
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
           {step === 'customize' ? (
             <>
               <button
                 onClick={() => setStep('template')}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
               >
-                Back
+                Atrás
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !formData.id || !formData.name}
-                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm bg-primary hover:bg-primary/90 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Creating...' : 'Create Agent'}
+                {isSubmitting ? 'Creando...' : 'Crear agente'}
               </button>
             </>
           ) : (
             <div className="ml-auto">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
               >
-                Cancel
+                Cancelar
               </button>
             </div>
           )}

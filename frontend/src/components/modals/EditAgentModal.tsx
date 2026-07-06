@@ -74,7 +74,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
 
   const handleSubmit = async () => {
     if (!formData.name) {
-      setError('Agent name is required');
+      setError('El nombre del agente es obligatorio');
       return;
     }
     setIsSubmitting(true);
@@ -89,7 +89,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
       const updatedAgent = await agentManagementApi.updateAgent(agent.id, request);
       onUpdated(updatedAgent);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update agent');
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el agente');
     } finally {
       setIsSubmitting(false);
     }
@@ -114,7 +114,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
           <div className="flex items-center gap-2 min-w-0">
             <Bot className="w-4 h-4 text-primary flex-shrink-0" />
             <h2 className="text-sm font-medium text-foreground truncate">
-              Edit <span className="text-foreground">{agent.name}</span>
+              Editar <span className="text-foreground">{agent.name}</span>
             </h2>
             <span className="text-[10px] font-mono text-muted-foreground/60 ml-1">{agent.id}</span>
           </div>
@@ -137,25 +137,25 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
           {/* Basic Info */}
           <section>
             <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2.5">
-              Basic information
+              Información básica
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">Name</label>
+                <label className="block text-xs text-muted-foreground mb-1">Nombre</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Security Analyst"
+                  placeholder="ej., Analista de Seguridad"
                   className="w-full h-9 px-3 bg-input border border-border rounded-md text-foreground placeholder-muted-foreground/60 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">Description</label>
+                <label className="block text-xs text-muted-foreground mb-1">Descripción</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="What does this agent do?"
+                  placeholder="¿Qué hace este agente?"
                   rows={2}
                   className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder-muted-foreground/60 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
@@ -167,10 +167,10 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
           <section>
             <div className="flex items-center justify-between mb-2.5">
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em]">
-                Tools
+                Herramientas
               </h3>
               <span className="text-[11px] text-muted-foreground">
-                <span className="text-primary font-medium tabular-nums">{formData.tools.length}</span> selected
+                <span className="text-primary font-medium tabular-nums">{formData.tools.length}</span> seleccionadas
               </span>
             </div>
             <div className="space-y-3">
@@ -215,7 +215,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
           <section>
             <div className="flex items-center justify-between mb-2.5">
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em]">
-                Skills
+                Habilidades
               </h3>
               <span className="text-[11px] text-muted-foreground tabular-nums">{formData.skills.length}</span>
             </div>
@@ -243,21 +243,21 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
               {/* Add new skill */}
               <div className="surface-muted p-3 space-y-2">
                 <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Add custom skill
+                  Añadir habilidad personalizada
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="text"
                     value={newSkill.id}
                     onChange={(e) => setNewSkill((prev) => ({ ...prev, id: e.target.value }))}
-                    placeholder="skill_id"
+                    placeholder="id_habilidad"
                     className="h-8 px-2 bg-input border border-border rounded-md text-xs text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
                   />
                   <input
                     type="text"
                     value={newSkill.name}
                     onChange={(e) => setNewSkill((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="Skill name"
+                    placeholder="Nombre de la habilidad"
                     className="h-8 px-2 bg-input border border-border rounded-md text-xs text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
@@ -265,7 +265,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
                   type="text"
                   value={newSkill.description}
                   onChange={(e) => setNewSkill((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Description"
+                  placeholder="Descripción"
                   className="w-full h-8 px-2 bg-input border border-border rounded-md text-xs text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <button
@@ -274,7 +274,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
                   className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] rounded-md bg-secondary hover:bg-accent text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <Plus className="w-3 h-3" />
-                  Add skill
+                  Añadir habilidad
                 </button>
               </div>
             </div>
@@ -284,7 +284,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 h-14 border-t border-border shrink-0">
           <button onClick={onClose} className="btn-ghost">
-            Cancel
+            Cancelar
           </button>
           <button
             onClick={handleSubmit}
@@ -292,7 +292,7 @@ export function EditAgentModal({ agent, tools, onClose, onUpdated }: EditAgentMo
             className="btn-primary"
           >
             {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            Save changes
+            Guardar cambios
           </button>
         </div>
       </div>

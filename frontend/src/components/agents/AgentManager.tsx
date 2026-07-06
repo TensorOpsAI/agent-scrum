@@ -61,7 +61,7 @@ function AgentCard({ agent, onToggleActive, onDelete, onEdit }: AgentCardProps) 
             <button
               onClick={() => onEdit(agent)}
               className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              title="Edit"
+              title="Editar"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -73,14 +73,14 @@ function AgentCard({ agent, onToggleActive, onDelete, onEdit }: AgentCardProps) 
                   ? 'text-emerald-400 hover:bg-emerald-500/10'
                   : 'text-muted-foreground hover:bg-accent'
               )}
-              title={agent.is_active ? 'Deactivate' : 'Activate'}
+              title={agent.is_active ? 'Desactivar' : 'Activar'}
             >
               {agent.is_active ? <Power className="w-3.5 h-3.5" /> : <PowerOff className="w-3.5 h-3.5" />}
             </button>
             <button
               onClick={() => onDelete(agent.id)}
               className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              title="Delete"
+              title="Eliminar"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -92,11 +92,11 @@ function AgentCard({ agent, onToggleActive, onDelete, onEdit }: AgentCardProps) 
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-1"
         >
           {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          <span className="tabular-nums">{agent.tools.length}</span> tools
+          <span className="tabular-nums">{agent.tools.length}</span> herramientas
           {agent.skills.length > 0 && (
             <>
               <span className="text-muted-foreground/40">·</span>
-              <span className="tabular-nums">{agent.skills.length}</span> skills
+              <span className="tabular-nums">{agent.skills.length}</span> habilidades
             </>
           )}
         </button>
@@ -106,7 +106,7 @@ function AgentCard({ agent, onToggleActive, onDelete, onEdit }: AgentCardProps) 
             {agent.tools.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                  Tools
+                  Herramientas
                 </h4>
                 <div className="flex flex-wrap gap-1">
                   {agent.tools.map((toolId) => (
@@ -124,7 +124,7 @@ function AgentCard({ agent, onToggleActive, onDelete, onEdit }: AgentCardProps) 
             {agent.skills.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                  Skills
+                  Habilidades
                 </h4>
                 <div className="space-y-1">
                   {agent.skills.map((skill) => (
@@ -161,7 +161,7 @@ function ToolCard({ tool, onEdit, onDelete }: ToolCardProps) {
           <span className={cn('status-dot flex-shrink-0', CATEGORY_DOTS[tool.category] || CATEGORY_DOTS.custom)} />
           <span className="text-sm font-medium text-foreground truncate">{tool.name}</span>
           {tool.is_builtin && (
-            <Lock className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" aria-label="Built-in" />
+            <Lock className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" aria-label="Integrada" />
           )}
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 ml-1">
             {tool.category}
@@ -174,7 +174,7 @@ function ToolCard({ tool, onEdit, onDelete }: ToolCardProps) {
                 <button
                   onClick={() => onEdit(tool)}
                   className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  title="Edit"
+                  title="Editar"
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
@@ -183,7 +183,7 @@ function ToolCard({ tool, onEdit, onDelete }: ToolCardProps) {
                 <button
                   onClick={() => onDelete(tool.id)}
                   className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  title="Delete"
+                  title="Eliminar"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -203,7 +203,7 @@ function ToolCard({ tool, onEdit, onDelete }: ToolCardProps) {
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-2"
         >
           {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          <span className="tabular-nums">{tool.capabilities.length}</span> capabilities
+          <span className="tabular-nums">{tool.capabilities.length}</span> capacidades
         </button>
       )}
 
@@ -238,11 +238,11 @@ function CreateToolForm({ categories, onSubmit, onCancel }: CreateToolFormProps)
 
   const handleSubmit = () => {
     if (!formData.id || !formData.name) {
-      setError('Tool ID and name are required');
+      setError('El ID y el nombre de la herramienta son obligatorios');
       return;
     }
     if (!/^[a-z][a-z0-9_]*$/.test(formData.id)) {
-      setError('Tool ID must start with a letter and contain only lowercase letters, numbers, and underscores');
+      setError('El ID de la herramienta debe empezar con una letra y contener solo letras minúsculas, números y guiones bajos');
       return;
     }
     onSubmit({
@@ -256,7 +256,7 @@ function CreateToolForm({ categories, onSubmit, onCancel }: CreateToolFormProps)
 
   return (
     <div className="surface p-4 space-y-3 animate-fade-in">
-      <h4 className="text-sm font-medium text-foreground">Create custom tool</h4>
+      <h4 className="text-sm font-medium text-foreground">Crear herramienta personalizada</h4>
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/30 text-destructive-foreground px-3 py-1.5 rounded-md text-xs">
@@ -266,41 +266,41 @@ function CreateToolForm({ categories, onSubmit, onCancel }: CreateToolFormProps)
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Tool ID</label>
+          <label className="block text-[11px] text-muted-foreground mb-1">ID de la herramienta</label>
           <input
             type="text"
             value={formData.id}
             onChange={(e) => setFormData((prev) => ({ ...prev, id: e.target.value }))}
-            placeholder="my_custom_tool"
+            placeholder="mi_herramienta_personalizada"
             className="w-full h-8 px-2 bg-input border border-border rounded-md text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
           />
         </div>
         <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Name</label>
+          <label className="block text-[11px] text-muted-foreground mb-1">Nombre</label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="My Custom Tool"
+            placeholder="Mi herramienta personalizada"
             className="w-full h-8 px-2 bg-input border border-border rounded-md text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-[11px] text-muted-foreground mb-1">Description</label>
+        <label className="block text-[11px] text-muted-foreground mb-1">Descripción</label>
         <input
           type="text"
           value={formData.description}
           onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-          placeholder="What does this tool do?"
+          placeholder="¿Qué hace esta herramienta?"
           className="w-full h-8 px-2 bg-input border border-border rounded-md text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Category</label>
+          <label className="block text-[11px] text-muted-foreground mb-1">Categoría</label>
           <select
             value={formData.category}
             onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
@@ -313,20 +313,20 @@ function CreateToolForm({ categories, onSubmit, onCancel }: CreateToolFormProps)
           </select>
         </div>
         <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Capabilities (comma-separated)</label>
+          <label className="block text-[11px] text-muted-foreground mb-1">Capacidades (separadas por comas)</label>
           <input
             type="text"
             value={formData.capabilities}
             onChange={(e) => setFormData((prev) => ({ ...prev, capabilities: e.target.value }))}
-            placeholder="analyze, report, fix"
+            placeholder="analizar, informar, corregir"
             className="w-full h-8 px-2 bg-input border border-border rounded-md text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
-        <button onClick={onCancel} className="btn-ghost">Cancel</button>
-        <button onClick={handleSubmit} className="btn-primary">Create tool</button>
+        <button onClick={onCancel} className="btn-ghost">Cancelar</button>
+        <button onClick={handleSubmit} className="btn-primary">Crear herramienta</button>
       </div>
     </div>
   );
@@ -361,7 +361,7 @@ export function AgentManager() {
       setCategories(categoriesData);
     } catch (err) {
       console.error('Failed to load agent data:', err);
-      setError('Failed to load agent data');
+      setError('No se pudieron cargar los datos de agentes');
     } finally {
       setIsLoading(false);
     }
@@ -380,7 +380,7 @@ export function AgentManager() {
   };
 
   const handleDeleteAgent = async (agentId: string) => {
-    if (!confirm(`Delete agent "${agentId}"? This cannot be undone.`)) return;
+    if (!confirm(`¿Eliminar el agente "${agentId}"? Esta acción no se puede deshacer.`)) return;
     try {
       await agentManagementApi.deleteAgent(agentId);
       setAgents((prev) => prev.filter((a) => a.id !== agentId));
@@ -408,12 +408,12 @@ export function AgentManager() {
       setTools((prev) => [...prev, newTool]);
       setShowCreateTool(false);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create tool');
+      setError(err instanceof Error ? err.message : 'No se pudo crear la herramienta');
     }
   };
 
   const handleDeleteTool = async (toolId: string) => {
-    if (!confirm(`Delete tool "${toolId}"? This cannot be undone.`)) return;
+    if (!confirm(`¿Eliminar la herramienta "${toolId}"? Esta acción no se puede deshacer.`)) return;
     try {
       await agentManagementApi.deleteTool(toolId);
       setTools((prev) => prev.filter((t) => t.id !== toolId));
@@ -448,7 +448,7 @@ export function AgentManager() {
             )}
           >
             <Bot className="w-3.5 h-3.5" />
-            Agents
+            Agentes
             <span className="text-[10px] tabular-nums opacity-70">({agents.length})</span>
           </button>
           <button
@@ -461,7 +461,7 @@ export function AgentManager() {
             )}
           >
             <Wrench className="w-3.5 h-3.5" />
-            Tools
+            Herramientas
             <span className="text-[10px] tabular-nums opacity-70">({tools.length})</span>
           </button>
         </div>
@@ -472,7 +472,7 @@ export function AgentManager() {
             className="inline-flex items-center gap-1.5 h-7 px-2.5 mb-1 rounded-md text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
           >
             <Plus className="w-3 h-3" />
-            Add agent
+            Añadir agente
           </button>
         ) : (
           <button
@@ -480,7 +480,7 @@ export function AgentManager() {
             className="inline-flex items-center gap-1.5 h-7 px-2.5 mb-1 rounded-md text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
           >
             <Plus className="w-3 h-3" />
-            Add tool
+            Añadir herramienta
           </button>
         )}
       </div>
@@ -497,13 +497,13 @@ export function AgentManager() {
             {/* Dynamic Agents */}
             <section>
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2">
-                Dynamic agents <span className="opacity-60 tabular-nums">({agents.length})</span>
+                Agentes dinámicos <span className="opacity-60 tabular-nums">({agents.length})</span>
               </h3>
               {agents.length === 0 ? (
                 <div className="surface-muted p-6 text-center">
                   <Bot className="w-7 h-7 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-sm text-foreground">No dynamic agents yet</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Click "Add agent" to create one</p>
+                  <p className="text-sm text-foreground">Aún no hay agentes dinámicos</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Haz clic en "Añadir agente" para crear uno</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -523,7 +523,7 @@ export function AgentManager() {
             {/* Templates */}
             <section>
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2">
-                Available templates <span className="opacity-60 tabular-nums">({templates.length})</span>
+                Plantillas disponibles <span className="opacity-60 tabular-nums">({templates.length})</span>
               </h3>
               <div className="space-y-1.5">
                 {templates.map((template) => (
@@ -531,7 +531,7 @@ export function AgentManager() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm text-foreground truncate">{template.name}</span>
                       <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
-                        {template.default_tools.length} tools
+                        {template.default_tools.length} herramientas
                       </span>
                     </div>
                     {template.description && (
@@ -555,13 +555,13 @@ export function AgentManager() {
             {/* Custom Tools */}
             <section>
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2">
-                Custom tools <span className="opacity-60 tabular-nums">({customTools.length})</span>
+                Herramientas personalizadas <span className="opacity-60 tabular-nums">({customTools.length})</span>
               </h3>
               {customTools.length === 0 ? (
                 <div className="surface-muted p-6 text-center">
                   <Wrench className="w-7 h-7 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-sm text-foreground">No custom tools yet</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Click "Add tool" to create one</p>
+                  <p className="text-sm text-foreground">Aún no hay herramientas personalizadas</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Haz clic en "Añadir herramienta" para crear una</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -575,7 +575,7 @@ export function AgentManager() {
             {/* Built-in Tools */}
             <section>
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-2">
-                Built-in tools <span className="opacity-60 tabular-nums">({builtinTools.length})</span>
+                Herramientas integradas <span className="opacity-60 tabular-nums">({builtinTools.length})</span>
               </h3>
               <div className="space-y-1.5">
                 {builtinTools.map((tool) => (

@@ -76,24 +76,24 @@ const PUBLISHER_BOARD_ID = -1;
 const publisherStories: Record<number, StorySeed> = {
   [-101]: {
     id: -101, board_id: PUBLISHER_BOARD_ID, epic_id: null,
-    title: 'OpenAI announces GPT-6 with native video reasoning',
-    description: 'OpenAI unveiled GPT-6 today, claiming a step-change in long-context video understanding. Embargo lifts at 9am ET.',
+    title: 'OpenAI anuncia GPT-6 con razonamiento de vídeo nativo',
+    description: 'OpenAI presentó hoy GPT-6, con lo que asegura un salto cualitativo en la comprensión de vídeo de contexto largo. El embargo se levanta a las 9h (hora de Nueva York).',
     acceptance_criteria: null,
     status: 'inbox', priority: 1, prd_content: null,
     task_count: 0, completed_task_count: 0,
   },
   [-102]: {
     id: -102, board_id: PUBLISHER_BOARD_ID, epic_id: null,
-    title: 'EU AI Act second-stage rules take effect Monday',
-    description: 'The high-risk AI obligations under the EU AI Act enter force next week. Industry has been quietly lobbying for delays.',
+    title: 'La segunda fase del Reglamento de IA de la UE entra en vigor el lunes',
+    description: 'Las obligaciones para la IA de alto riesgo del Reglamento de IA de la UE entran en vigor la próxima semana. El sector ha presionado discretamente para retrasarlas.',
     acceptance_criteria: null,
     status: 'inbox', priority: 2, prd_content: null,
     task_count: 0, completed_task_count: 0,
   },
   [-103]: {
     id: -103, board_id: PUBLISHER_BOARD_ID, epic_id: null,
-    title: 'Anthropic raises $8B Series F at $200B valuation',
-    description: 'Sources confirm a fresh round led by Lightspeed and Sequoia. Anthropic has not commented publicly.',
+    title: 'Anthropic capta 8.000 millones de dólares en una ronda Serie F con una valoración de 200.000 millones',
+    description: 'Fuentes confirman una nueva ronda liderada por Lightspeed y Sequoia. Anthropic no ha hecho declaraciones públicas.',
     acceptance_criteria: null,
     status: 'inbox', priority: 1, prd_content: null,
     task_count: 0, completed_task_count: 0,
@@ -104,37 +104,37 @@ const publisherComments: Record<number, CommentSeed[]> = {
   [-101]: [
     {
       id: -1001, story_id: -101, task_id: null, agent_type: 'news_curator',
-      content: 'Triaged this morning. Embargo lifts at 9am ET — making it the lead.',
+      content: 'Clasificado esta mañana. El embargo se levanta a las 9h — será la noticia principal.',
       metadata: { action: 'triaged' },
       secondsAgo: 540,
     },
     {
       id: -1002, story_id: -101, task_id: null, agent_type: 'journalist',
-      content: '600-word draft up. Lede on the 30-minute video benchmark, plus context on competing models and an Altman quote.',
+      content: 'Borrador de 600 palabras listo. Entradilla sobre el hito de los 30 minutos de vídeo, más contexto sobre modelos de la competencia y una cita de Altman.',
       metadata: { action: 'drafted' },
       secondsAgo: 360,
     },
     {
       id: -1003, story_id: -101, task_id: null, agent_type: 'editor',
-      content: 'Pushed back on the lede and a thin Hugging Face quote. Journalist agreed to cut the quote rather than weaken the piece.',
+      content: 'Cuestioné la entradilla y una cita poco sólida de Hugging Face. El periodista aceptó eliminarla en lugar de debilitar la pieza.',
       metadata: { action: 'reviewed', approved: false },
       secondsAgo: 240,
     },
     {
       id: -1004, story_id: -101, task_id: null, agent_type: 'editor',
-      content: 'Revised draft is tighter. Approved.',
+      content: 'El borrador revisado es más sólido. Aprobado.',
       metadata: { action: 'approved', approved: true },
       secondsAgo: 180,
     },
     {
       id: -1005, story_id: -101, task_id: null, agent_type: 'creative_director',
-      content: 'Hero image: clean shot of the new product page over the standard OpenAI logo treatment. Less promotional.',
+      content: 'Imagen principal: una captura limpia de la nueva página del producto en lugar del tratamiento habitual con el logo de OpenAI. Menos promocional.',
       metadata: { action: 'visuals_added' },
       secondsAgo: 90,
     },
     {
       id: -1006, story_id: -101, task_id: null, agent_type: 'news_curator',
-      content: 'Embargo lifted. Pushed live.',
+      content: 'Embargo levantado. Publicado.',
       metadata: { action: 'published' },
       secondsAgo: 20,
     },
@@ -142,7 +142,7 @@ const publisherComments: Record<number, CommentSeed[]> = {
   [-103]: [
     {
       id: -1101, story_id: -103, task_id: null, agent_type: 'news_curator',
-      content: 'Holding this until we have a second source on the funding figure. One named source isn\'t enough.',
+      content: 'Retenido hasta tener una segunda fuente sobre la cifra de financiación. Una sola fuente identificada no es suficiente.',
       metadata: { action: 'on_hold' },
       secondsAgo: 480,
     },
@@ -150,51 +150,99 @@ const publisherComments: Record<number, CommentSeed[]> = {
 };
 
 const publisherTimeline: Array<{ t: number; step: ReplayStep }> = [
-  // 0-6s: News Curator triages incoming briefs
-  { t:   400, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'working', task: 'Triaging morning briefs' } } },
-  { t:   800, step: msg(-1, 'news_curator', 'News Curator', "Three briefs landed overnight. The OpenAI one is biggest — embargo lifts at 9. Picking that up first.") },
+  // 0-5s: News Curator triages incoming briefs and splits up the work
+  { t:   400, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'working', task: 'Clasificando los briefs de la mañana' } } },
+  { t:   800, step: msg(-1, 'news_curator', 'Curador de Noticias', "Llegaron tres briefs durante la noche. Vamos a repartirlos entre el equipo.") },
   { t:  1800, step: { type: 'story-add', data: { storyId: -101 } } },
   { t:  1800, step: { type: 'story-pulse', data: { storyId: -101 } } },
   { t:  2700, step: { type: 'story-add', data: { storyId: -103 } } },
   { t:  2700, step: { type: 'story-pulse', data: { storyId: -103 } } },
   { t:  3400, step: { type: 'story-add', data: { storyId: -102 } } },
   { t:  3400, step: { type: 'story-pulse', data: { storyId: -102 } } },
-  { t:  4200, step: msg(-2, 'news_curator', 'News Curator', '@Journalist take the GPT-6 story — the embargo gives us a hard deadline. The funding rumor needs a second source first.', { to: 'journalist', toName: 'Journalist', storyId: -101 }) },
+  { t:  4200, step: msg(-2, 'news_curator', 'Curador de Noticias', '@Periodista, la de OpenAI tiene embargo a las 9h — empieza por ahí. Yo redacto la de la UE mientras confirmamos la segunda fuente de Anthropic.', { to: 'journalist', toName: 'Periodista', storyId: -101 }) },
   { t:  5000, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'idle', task: null } } },
 
-  // 6-15s: Journalist writes the lead story
-  { t:  5800, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'working', task: 'Drafting GPT-6 announcement' } } },
+  // 5-11s: Journalist starts the lead story, while News Curator kicks off the EU piece in parallel
+  { t:  5800, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'working', task: 'Redactando el anuncio de GPT-6' } } },
   { t:  6200, step: { type: 'story-update', data: { storyId: -101, status: 'writing' } } },
   { t:  6200, step: { type: 'story-pulse', data: { storyId: -101 } } },
-  { t:  7400, step: msg(-3, 'journalist', 'Journalist', 'Reading the press release now. They claim 30-minute coherent video reasoning — that\'s the headline.', { storyId: -101 }) },
-  { t:  9200, step: msg(-4, 'journalist', 'Journalist', 'Draft is ~600 words: lede on the video benchmark, context on competing models, quote from Altman, skeptical quote from Hugging Face.', { storyId: -101 }) },
-  { t: 10800, step: msg(-5, 'journalist', 'Journalist', 'Pushing to @Editor.', { to: 'editor', toName: 'Editor', storyId: -101 }) },
-  { t: 11400, step: { type: 'story-update', data: { storyId: -101, status: 'editing' } } },
-  { t: 11400, step: { type: 'story-pulse', data: { storyId: -101 } } },
-  { t: 12000, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'waiting', task: 'Awaiting edits' } } },
+  { t:  7000, step: msg(-3, 'journalist', 'Periodista', 'Leyendo el comunicado de OpenAI. Razonamiento de vídeo coherente de 30 minutos — ese es el titular.', { storyId: -101 }) },
+  { t:  8000, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'working', task: 'Redactando la nota sobre el Reglamento de IA de la UE' } } },
+  { t:  8000, step: { type: 'story-update', data: { storyId: -102, status: 'writing' } } },
+  { t:  8000, step: { type: 'story-pulse', data: { storyId: -102 } } },
+  { t:  9000, step: msg(-4, 'news_curator', 'Curador de Noticias', 'Nota breve sobre las nuevas obligaciones de la UE — la envío a @Editor.', { to: 'editor', toName: 'Editor', storyId: -102 }) },
+  { t:  9400, step: { type: 'story-update', data: { storyId: -102, status: 'editing' } } },
+  { t:  9400, step: { type: 'story-pulse', data: { storyId: -102 } } },
+  { t:  9800, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'idle', task: null } } },
 
-  // 15-22s: Editor pushes back (real disagreement → resolution)
-  { t: 12600, step: { type: 'agent-status', data: { agentId: 'editor', status: 'working', task: 'Editing GPT-6 piece' } } },
-  { t: 14200, step: msg(-6, 'editor', 'Editor', "Lede buries the news — open with the 30-minute video benchmark, not the model name. Also, the Hugging Face quote is too thin; either get something concrete or cut it.", { to: 'journalist', toName: 'Journalist', storyId: -101 }) },
-  { t: 15600, step: msg(-7, 'journalist', 'Journalist', 'Fair on the lede. On the quote — I\'ll cut it rather than weaken the piece chasing it before deadline.', { to: 'editor', toName: 'Editor', storyId: -101 }) },
-  { t: 17000, step: msg(-8, 'editor', 'Editor', "Agreed. Approved. Sending to creatives.", { storyId: -101 }) },
-  { t: 17600, step: { type: 'story-update', data: { storyId: -101, status: 'creatives' } } },
-  { t: 17600, step: { type: 'story-pulse', data: { storyId: -101 } } },
-  { t: 18200, step: { type: 'agent-status', data: { agentId: 'editor', status: 'idle', task: null } } },
-  { t: 18200, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'idle', task: null } } },
+  // 9-12s: Journalist wraps the OpenAI draft, Editor starts on the EU piece
+  { t:  9800, step: msg(-5, 'journalist', 'Periodista', 'El borrador de OpenAI tiene ~600 palabras: entradilla sobre el vídeo, cita de Altman, cita escéptica de Hugging Face.', { storyId: -101 }) },
+  { t: 10800, step: { type: 'agent-status', data: { agentId: 'editor', status: 'working', task: 'Revisando la nota sobre la UE' } } },
+  { t: 11400, step: msg(-6, 'journalist', 'Periodista', 'Lo envío a @Editor.', { to: 'editor', toName: 'Editor', storyId: -101 }) },
+  { t: 11800, step: { type: 'story-update', data: { storyId: -101, status: 'editing' } } },
+  { t: 11800, step: { type: 'story-pulse', data: { storyId: -101 } } },
+  { t: 12200, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'waiting', task: 'Esperando la edición' } } },
 
-  // 22-28s: Creative Director adds visuals
-  { t: 18800, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'working', task: 'Sourcing hero image' } } },
-  { t: 20000, step: msg(-9, 'creative_director', 'Creative Director', 'Going with a clean shot of the new product page over the OpenAI logo treatment — feels less promotional.', { storyId: -101 }) },
-  { t: 21800, step: { type: 'story-update', data: { storyId: -101, status: 'ready_to_publish' } } },
-  { t: 21800, step: { type: 'story-pulse', data: { storyId: -101 } } },
-  { t: 22400, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'idle', task: null } } },
+  // 12-15s: EU piece clears editing and creatives while Editor also has OpenAI queued
+  { t: 12200, step: msg(-7, 'editor', 'Editor', 'La nota de la UE está bien — aprobada. Pasa a creativos.', { storyId: -102 }) },
+  { t: 12600, step: { type: 'story-update', data: { storyId: -102, status: 'creatives' } } },
+  { t: 12600, step: { type: 'story-pulse', data: { storyId: -102 } } },
+  { t: 13000, step: { type: 'agent-status', data: { agentId: 'editor', status: 'working', task: 'Editando la pieza de GPT-6' } } },
+  { t: 13000, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'working', task: 'Buscando imagen para la nota de la UE' } } },
+  { t: 14000, step: { type: 'story-update', data: { storyId: -102, status: 'ready_to_publish' } } },
+  { t: 14000, step: { type: 'story-pulse', data: { storyId: -102 } } },
+  { t: 14400, step: msg(-8, 'creative_director', 'Director Creativo', 'Imagen lista para la nota de la UE.', { storyId: -102 }) },
+  { t: 14800, step: { type: 'story-update', data: { storyId: -102, status: 'published' } } },
+  { t: 14800, step: { type: 'story-pulse', data: { storyId: -102 } } },
+  { t: 14800, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'idle', task: null } } },
 
-  // 28-32s: Publish at embargo
-  { t: 23200, step: msg(-10, 'news_curator', 'News Curator', "Embargo lifted. Pushing live.") },
+  // 15-19s: Editor pushes back on OpenAI (real disagreement → resolution)
+  { t: 15200, step: msg(-9, 'editor', 'Editor', "La entradilla de OpenAI entierra la noticia — abre con el hito del vídeo, no con el modelo. Y la cita de Hugging Face es floja.", { to: 'journalist', toName: 'Periodista', storyId: -101 }) },
+  { t: 16600, step: msg(-10, 'journalist', 'Periodista', 'De acuerdo. La quito antes que debilitar la pieza contra el plazo.', { to: 'editor', toName: 'Editor', storyId: -101 }) },
+  { t: 18000, step: msg(-11, 'editor', 'Editor', "Aprobado. Lo envío a creativos.", { storyId: -101 }) },
+  { t: 18400, step: { type: 'story-update', data: { storyId: -101, status: 'creatives' } } },
+  { t: 18400, step: { type: 'story-pulse', data: { storyId: -101 } } },
+  { t: 18800, step: { type: 'agent-status', data: { agentId: 'editor', status: 'idle', task: null } } },
+  { t: 18800, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'idle', task: null } } },
+
+  // 19-21s: Creative Director works OpenAI visuals while second source for Anthropic comes through
+  { t: 18800, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'working', task: 'Buscando la imagen principal de OpenAI' } } },
+  { t: 19000, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'working', task: 'Confirmando la segunda fuente de la ronda de Anthropic' } } },
+  { t: 20000, step: msg(-12, 'news_curator', 'Curador de Noticias', 'Segunda fuente confirmada. @Periodista, adelante con la de Anthropic.', { to: 'journalist', toName: 'Periodista', storyId: -103 }) },
+  { t: 20400, step: { type: 'story-update', data: { storyId: -103, status: 'writing' } } },
+  { t: 20400, step: { type: 'story-pulse', data: { storyId: -103 } } },
+  { t: 20400, step: { type: 'agent-status', data: { agentId: 'news_curator', status: 'idle', task: null } } },
+  { t: 20400, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'working', task: 'Redactando la financiación de Anthropic' } } },
+
+  // 21-23s: OpenAI visuals land, ready to publish
+  { t: 21000, step: msg(-13, 'creative_director', 'Director Creativo', 'Imagen de OpenAI lista — captura limpia de la web del producto, menos promocional.', { storyId: -101 }) },
+  { t: 21400, step: { type: 'story-update', data: { storyId: -101, status: 'ready_to_publish' } } },
+  { t: 21400, step: { type: 'story-pulse', data: { storyId: -101 } } },
+  { t: 21400, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'idle', task: null } } },
+
+  // 22-24s: Anthropic draft moves to editing while OpenAI publishes at embargo
+  { t: 22400, step: msg(-14, 'journalist', 'Periodista', 'Anthropic: 8.000 millones liderados por Lightspeed y Sequoia. Lo envío a @Editor.', { to: 'editor', toName: 'Editor', storyId: -103 }) },
+  { t: 22800, step: { type: 'story-update', data: { storyId: -103, status: 'editing' } } },
+  { t: 22800, step: { type: 'story-pulse', data: { storyId: -103 } } },
+  { t: 22800, step: { type: 'agent-status', data: { agentId: 'journalist', status: 'idle', task: null } } },
+  { t: 23200, step: { type: 'agent-status', data: { agentId: 'editor', status: 'working', task: 'Revisando la financiación de Anthropic' } } },
+  { t: 23800, step: msg(-15, 'news_curator', 'Curador de Noticias', 'Embargo levantado en la de OpenAI. Publicando.') },
   { t: 24400, step: { type: 'story-update', data: { storyId: -101, status: 'published' } } },
   { t: 24400, step: { type: 'story-pulse', data: { storyId: -101 } } },
-  { t: 25400, step: msg(-11, 'news_curator', 'News Curator', 'Live. Onto the funding rumor — @Journalist, ping me when you have the second source.', { to: 'journalist', toName: 'Journalist', storyId: -103 }) },
+
+  // 25-28s: Anthropic piece clears the rest of the pipeline
+  { t: 25000, step: msg(-16, 'editor', 'Editor', 'Aprobada la de Anthropic.', { storyId: -103 }) },
+  { t: 25400, step: { type: 'story-update', data: { storyId: -103, status: 'creatives' } } },
+  { t: 25400, step: { type: 'story-pulse', data: { storyId: -103 } } },
+  { t: 25400, step: { type: 'agent-status', data: { agentId: 'editor', status: 'idle', task: null } } },
+  { t: 25800, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'working', task: 'Buscando imagen para Anthropic' } } },
+  { t: 26800, step: { type: 'story-update', data: { storyId: -103, status: 'ready_to_publish' } } },
+  { t: 26800, step: { type: 'story-pulse', data: { storyId: -103 } } },
+  { t: 27200, step: msg(-17, 'creative_director', 'Director Creativo', 'Imagen de Anthropic lista.', { storyId: -103 }) },
+  { t: 27600, step: { type: 'story-update', data: { storyId: -103, status: 'published' } } },
+  { t: 27600, step: { type: 'story-pulse', data: { storyId: -103 } } },
+  { t: 27600, step: { type: 'agent-status', data: { agentId: 'creative_director', status: 'idle', task: null } } },
+  { t: 27600, step: msg(-18, 'news_curator', 'Curador de Noticias', 'Las tres noticias están publicadas. Buen ritmo esta mañana.') },
 ];
 
 // ============================================================
@@ -314,8 +362,8 @@ export const DEMO_TIMELINES: Record<string, DemoTimeline> = {
     tasks: {},
     comments: publisherComments,
     steps: publisherTimeline,
-    durationMs: 26500,
-    headline: 'Watching a recorded run of the editorial swarm shipping a breaking-news article',
+    durationMs: 29000,
+    headline: 'Viendo una repetición grabada del equipo editorial publicando tres artículos en paralelo',
   },
   software_dev: {
     stories: softwareStories,

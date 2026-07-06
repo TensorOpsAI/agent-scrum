@@ -53,7 +53,7 @@ function KanbanColumn({
 
         {stories.length === 0 && (
           <div className="text-center py-10 text-xs text-muted-foreground/60 italic">
-            No items
+            Sin elementos
           </div>
         )}
       </div>
@@ -73,9 +73,9 @@ const WORKFLOW_STEPS: Record<string, { icon: React.ReactNode; steps: string[] }>
   publisher: {
     icon: <Sparkles className="w-6 h-6" />,
     steps: [
-      'News Curator evaluates the brief and creates article assignments',
-      'Journalist drafts content, Editor reviews for quality',
-      'Creative Director adds visuals, then articles are published',
+      'El Curador de Noticias evalúa el brief y crea encargos de artículos',
+      'El Periodista redacta el contenido, el Editor revisa la calidad',
+      'El Director Creativo añade elementos visuales y se publican los artículos',
     ],
   },
   talent_acquisition: {
@@ -116,8 +116,7 @@ function EmptyBoardState({
   onReplay?: () => void;
   hasPlayed?: boolean;
 }) {
-  const workflow = WORKFLOW_STEPS[templateId] || WORKFLOW_STEPS.software_dev;
-  const article = /^[aeiou]/i.test(inputNoun) ? 'an' : 'a';
+  const workflow = WORKFLOW_STEPS[templateId] || WORKFLOW_STEPS.publisher;
 
   return (
     <div className="flex items-center justify-center h-full px-8">
@@ -127,22 +126,22 @@ function EmptyBoardState({
         </div>
 
         <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
-          Get started in seconds
+          Empieza en segundos
         </h2>
         <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
-          Submit {inputNoun === 'PRD' ? 'a' : article}{' '}
-          <span className="text-foreground font-medium">{inputNoun}</span> and watch AI agents
-          turn it into actionable {itemNoun.toLowerCase()}s on this board.
+          Envía un{' '}
+          <span className="text-foreground font-medium">{inputNoun}</span> y observa cómo los agentes de IA lo
+          convierten en {itemNoun.toLowerCase()}s en este tablero.
         </p>
 
         <div className="flex flex-col items-center gap-3 mb-8">
           {isPublisher ? (
             <button
               onClick={onGenerate}
-              className="inline-flex items-center gap-2 h-11 px-6 rounded-lg font-medium bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02]"
+              className="inline-flex items-center gap-2 h-11 px-6 rounded-lg font-medium bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg shadow-primary/30 transition-all hover:scale-[1.02]"
             >
               <Sparkles className="w-4 h-4" />
-              Generate {itemNoun}s
+              Generar {itemNoun}s
             </button>
           ) : (
             <button
@@ -150,12 +149,12 @@ function EmptyBoardState({
               className="inline-flex items-center gap-2 h-11 px-6 rounded-lg font-medium bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02]"
             >
               <FileText className="w-4 h-4" />
-              Submit {inputNoun}
+              Enviar {inputNoun}
             </button>
           )}
           {!isPublisher && (
             <span className="text-xs text-muted-foreground/70">
-              Don't have one? The modal includes an example you can try instantly.
+              ¿No tienes uno? El modal incluye un ejemplo que puedes probar al instante.
             </span>
           )}
           {onReplay && hasPlayed && (
@@ -164,14 +163,14 @@ function EmptyBoardState({
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
             >
               <RotateCcw className="w-3 h-3" />
-              Replay 30-second demo
+              Repetir demo de 28 segundos
             </button>
           )}
         </div>
 
         <div className="surface p-5 text-left">
           <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] mb-4">
-            How it works
+            Cómo funciona
           </h3>
           <div className="space-y-3">
             {workflow.steps.map((step, i) => (
@@ -186,7 +185,7 @@ function EmptyBoardState({
           <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/60">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Everything happens automatically — just watch your board fill up.
+              Todo sucede automáticamente — solo observa cómo se llena tu tablero.
             </p>
           </div>
         </div>
@@ -206,10 +205,10 @@ export function KanbanBoard() {
   const { fetchStories } = useStoryStore();
   const activeIds = useStoryActivity();
 
-  const epicNoun = currentBoard?.epic_noun ?? 'Epic';
-  const inputNoun = currentBoard?.input_noun ?? 'PRD';
-  const itemNoun = currentBoard?.item_noun ?? 'Story';
-  const templateId = currentBoard?.template_id ?? 'software_dev';
+  const epicNoun = currentBoard?.epic_noun ?? 'Tema';
+  const inputNoun = currentBoard?.input_noun ?? 'Brief';
+  const itemNoun = currentBoard?.item_noun ?? 'Artículo';
+  const templateId = currentBoard?.template_id ?? 'publisher';
   const automationEnabled = currentBoard?.agent_automation === true;
   const isPublisher = templateId === 'publisher';
 
@@ -278,9 +277,9 @@ export function KanbanBoard() {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
           </span>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-foreground">Demo replay running</div>
+            <div className="text-xs font-medium text-foreground">Repetición de demo en curso</div>
             <div className="text-[10px] text-muted-foreground">
-              {replay.headline ?? 'Watching a recorded run of the swarm'}
+              {replay.headline ?? 'Viendo una repetición grabada de la automatización'}
             </div>
           </div>
           <button
@@ -288,7 +287,7 @@ export function KanbanBoard() {
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border hover:bg-accent text-foreground transition-colors"
           >
             <X className="w-3 h-3" />
-            Skip
+            Saltar
           </button>
         </div>
       )}
@@ -296,9 +295,9 @@ export function KanbanBoard() {
         <div className="mx-4 mb-3 flex items-center gap-3 px-3 py-2 rounded-md border border-border bg-card/40 animate-fade-in">
           <Play className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-foreground">This was a demo replay</div>
+            <div className="text-xs font-medium text-foreground">Esto fue una repetición de demo</div>
             <div className="text-[10px] text-muted-foreground">
-              Add your Gemini API key in Settings to run your own briefs through real agents
+              Añade tu clave API en Configuración para procesar tus propios briefs con agentes reales
             </div>
           </div>
           <button
@@ -306,7 +305,7 @@ export function KanbanBoard() {
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border hover:bg-accent text-foreground transition-colors"
           >
             <RotateCcw className="w-3 h-3" />
-            Replay
+            Repetir
           </button>
         </div>
       )}
@@ -318,7 +317,7 @@ export function KanbanBoard() {
             value={selectedEpicId ?? ''}
             onChange={(e) => setSelectedEpic(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">All {epicNoun}s</option>
+            <option value="">Todos los {epicNoun}s</option>
             {epics.map((epic) => (
               <option key={epic.id} value={epic.id}>{epic.title}</option>
             ))}
